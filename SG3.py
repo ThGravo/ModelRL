@@ -78,7 +78,7 @@ class RDDomain(Domain):
         return self.TransitionProbs[action][state][0]
 
 
-'Example'
+'E Example'
 rdd = RDDomain('RDD',
                       NumberStates,
                       NumberAgents,
