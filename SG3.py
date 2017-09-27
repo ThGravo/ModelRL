@@ -38,17 +38,22 @@ class Domain:
 'RANDOM STOCHASTIC DOMAIN'
 class RSD(Domain):
     def __init__(self, name, States, Agents, Actions, slope, offset):
+        np.random.seed(43432)
         Domain.__init__(self, name, States, Agents, Actions, TransitionProbs= None)
         randomTrans = np.random.rand(self.Actions * self.Agents, self.States, self.States)
-        print(randomTrans.shape)
+        #print(randomTrans.shape)
         randomTrans = np.maximum(0, randomTrans * slope + offset)
         normFac = randomTrans.sum(axis=-1, keepdims=1)
-        for i in range(self.Actions * self.Agents):
-            for j in range(self.States):
-                if normFac[i][j][0] < sys.float_info.epsilon:
-                    print('NORM '+str(i))
-        randomTrans = np.true_divide(randomTrans, randomTrans.sum(axis=-1, keepdims=1))
-        print(randomTrans.shape)
+        while not normFac.all():
+            for i in range(self.Actions * self.Agents):
+                for j in range(self.States):
+                    if normFac[i][j][0] < sys.float_info.epsilon:
+                        randomTrans[i,j,:] = np.random.rand(1, 1, self.States)
+                        print("bla "+str(i)+","+str(j))
+            normFac = randomTrans.sum(axis=-1, keepdims=1)
+
+        randomTrans = np.true_divide(randomTrans, normFac)
+        #print(randomTrans.shape)
         self.TransitionProbs = randomTrans
 
 
