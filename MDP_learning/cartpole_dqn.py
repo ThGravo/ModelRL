@@ -13,6 +13,21 @@ from keras.callbacks import Callback
 EPISODES = 300
 
 
+class NBatchLogger(Callback):
+    def __init__(self, display=100):
+        # display: Number of batches to wait before outputting loss
+        self.seen = 0
+        self.display = display
+
+    def on_batch_end(self, batch, logs={}):
+        self.seen += logs.get('size', 0)
+        if self.seen % self.display == 0:
+            print('\n{0} - Batch Loss: {1}'.format(self.seen, self.params['metrics'][0]))
+
+
+out_batch = NBatchLogger(display=1000)
+
+
 # DQN Agent for the Cartpole
 # it uses Neural Network to approximate q function
 # and replay memory & target q network
@@ -32,7 +47,8 @@ class DQNAgent:
         self.epsilon = 1.0
         self.epsilon_decay = 0.999
         self.epsilon_min = 0.01
-        self.batch_size = 64
+        self.batch_size = 64*3
+        self.net_train_epochs = 3
         self.train_start = 1000
         # create replay memory using deque
         self.memory = deque(maxlen=2000)
@@ -50,8 +66,6 @@ class DQNAgent:
         if self.load_model:
             self.qmodel.load_weights("./save_model/cartpole_dqn.h5")
 
-
-
     # approximate Q function
     # state is input and Q Value of each action is output
     def build_qmodel(self):
@@ -63,21 +77,21 @@ class DQNAgent:
         qmodel.add(Dense(self.action_size, activation='linear',
                          kernel_initializer='he_uniform'))
         qmodel.summary()
-        qmodel.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        qmodel.compile(loss='mse', optimizer=Adam(lr=self.learning_rate), metrics=['accuracy'])
         return qmodel
 
     # approximate Transition function
     # state and action is input and successor state is output
     def build_tmodel(self):
         tmodel = Sequential()
-        tmodel.add(Dense(24, input_dim=self.state_size+1, activation='relu',
+        tmodel.add(Dense(24, input_dim=self.state_size + 1, activation='relu',
                          kernel_initializer='he_uniform'))
         tmodel.add(Dense(24, activation='relu',
                          kernel_initializer='he_uniform'))
         tmodel.add(Dense(self.state_size, activation='linear',
                          kernel_initializer='he_uniform'))
         tmodel.summary()
-        tmodel.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        tmodel.compile(loss='mse', optimizer=Adam(lr=self.learning_rate), metrics=['accuracy'])
         return tmodel
 
     # approximate Reward function
@@ -91,7 +105,7 @@ class DQNAgent:
         rmodel.add(Dense(1, activation='linear',
                          kernel_initializer='he_uniform'))
         rmodel.summary()
-        rmodel.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        rmodel.compile(loss='mse', optimizer=Adam(lr=self.learning_rate), metrics=['accuracy'])
         return rmodel
 
     # approximate Done value
@@ -100,12 +114,12 @@ class DQNAgent:
         dmodel = Sequential()
         dmodel.add(Dense(24, input_dim=self.state_size, activation='relu',
                          kernel_initializer='he_uniform'))
-        dmodel.add(Dense(24, activation='relu',
-                         kernel_initializer='he_uniform'))
+        #dmodel.add(Dense(24, activation='relu',
+        #                 kernel_initializer='he_uniform'))
         dmodel.add(Dense(1, activation='sigmoid',
                          kernel_initializer='he_uniform'))
         dmodel.summary()
-        dmodel.compile(loss='kld', optimizer=Adam(lr=self.learning_rate))
+        dmodel.compile(loss='binary_crossentropy', optimizer=Adam(lr=self.learning_rate), metrics=['accuracy'])
         return dmodel
 
     # after some time interval update the target model to be same with model
@@ -133,11 +147,12 @@ class DQNAgent:
         batch_size = min(self.batch_size, len(self.memory))
         mini_batch = random.sample(self.memory, batch_size)
 
-        update_input = np.zeros((batch_size, self.state_size+1)) # TODO action repesentation & corresponding network architecture
+        update_input = np.zeros(
+            (batch_size, self.state_size + 1))  # TODO action repesentation & corresponding network architecture
         update_target = np.zeros((batch_size, self.state_size))
         action, reward, done = [], [], []
 
-        for i in range(self.batch_size):
+        for i in range(batch_size):
             update_input[i][:self.state_size] = mini_batch[i][0]
             update_input[i][-1] = mini_batch[i][1]
             action.append(mini_batch[i][1])
@@ -148,7 +163,7 @@ class DQNAgent:
         target = self.qmodel.predict(update_input[:, :-1])
         target_val = self.target_model.predict(update_target)
 
-        for i in range(self.batch_size):
+        for i in range(batch_size):
             # Q Learning: get maximum Q value at s' from target model
             if done[i]:
                 target[i][action[i]] = reward[i]
@@ -157,18 +172,33 @@ class DQNAgent:
                     np.amax(target_val[i]))
 
         # and do the model fit!
+        val_acc = []
 
-        self.qmodel.fit(update_input[:, :-1], target, batch_size=self.batch_size,
-                        epochs=1, verbose=0)    
-        self.tmodel.fit(update_input, update_target, batch_size=self.batch_size,
-                        epochs=1,
+        self.qmodel.fit(update_input[:, :-1], target, batch_size=batch_size,
+                        epochs=self.net_train_epochs,
                         verbose=0,
-                        #callbacks=[history]
+                        validation_split=0.1)
+
+        self.tmodel.fit(update_input, update_target, batch_size=batch_size,
+                        epochs=self.net_train_epochs,
+                        verbose=0,
+                        validation_split=0.1,
+                        # callbacks=[out_batch],
+                        # metrics = ['accuracy']
+                        # callbacks=[history]
                         ) # TODO callback
-        self.rmodel.fit(update_input[:, :-1], reward, batch_size=self.batch_size,
-                        epochs=1, verbose=0) # TODO Currently predicts reward based on state input data. Should consider making reward predictions action-dependent too.
-        self.dmodel.fit(update_input[:, :-1], done, batch_size=self.batch_size,
-                        epochs=1, verbose=0)
+
+        train_history = self.rmodel.fit(update_input[:, :-1], reward, batch_size=batch_size,
+                        epochs=self.net_train_epochs,
+                        verbose=0,
+                        validation_split=0.1)  # TODO Currently predicts reward based on state input data. Should consider making reward predictions action-dependent too.
+
+        self.dmodel.fit(update_input[:, :-1], done, batch_size=batch_size,
+                        epochs=self.net_train_epochs,
+                        verbose=0,
+                        validation_split=0.1)
+        val_acc.append(train_history.history['val_acc'])
+        return val_acc
 
 
 ''' 
@@ -180,12 +210,14 @@ Here's some code I found, but haven't checked it out. Should implement something
 https://github.com/fchollet/keras/issues/2850
 '''
 
+
 class LossHistory(Callback):
     def on_train_begin(self, logs={}):
         self.losses = []
 
     def on_batch_end(self, batch, logs={}):
         self.losses.append(logs.get('loss'))
+
 
 if __name__ == "__main__":
     # In case of CartPole-v1, maximum length of episode is 500
@@ -197,7 +229,7 @@ if __name__ == "__main__":
 
     agent = DQNAgent(state_size, action_size)
 
-    scores, episodes = [], []
+    scores, episodes, val_accs, episodes_val = [], [], [], []
 
     for e in range(EPISODES):
         done = False
@@ -219,7 +251,8 @@ if __name__ == "__main__":
             # save the sample <s, a, r, s'> to the replay memory
             agent.append_sample(state, action, reward, next_state, done)
             # every time step do the training
-            agent.train_model()
+            val_acc = agent.train_model()
+
             score += reward
             state = next_state
 
@@ -231,10 +264,19 @@ if __name__ == "__main__":
                 score = score if score == 500 else score + 100
                 scores.append(score)
                 episodes.append(e)
+                '''
                 pylab.plot(episodes, scores, 'b')
                 pylab.savefig("./save_graph/cartpole_dqn.png")
                 print("episode:", e, "  score:", score, "  memory length:",
                       len(agent.memory), "  epsilon:", agent.epsilon)
+                '''
+                if val_acc is not None:
+                    val_accs.append(val_acc[-1])
+                    episodes_val.append(e)
+                    pylab.plot(episodes_val, val_accs, 'b')
+                    pylab.savefig("./save_graph/cartpole_dqn_val_accs.png")
+                    if val_acc is not None:
+                        print("episode:", e, "  val_acc:", val_acc[-1])
 
                 # if the mean of scores of last 10 episode is bigger than 490
                 # stop training
@@ -244,4 +286,3 @@ if __name__ == "__main__":
         # save the model
         if e % 50 == 0:
             agent.qmodel.save_weights("./save_model/cartpole_dqn.h5")
-
