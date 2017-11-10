@@ -166,9 +166,19 @@ class DQNAgent:
                         #callbacks=[history]
                         ) # TODO callback
         self.rmodel.fit(update_input[:, :-1], reward, batch_size=self.batch_size,
-                        epochs=1, verbose=0)
+                        epochs=1, verbose=0) # TODO Currently predicts reward based on state input data. Should consider making reward predictions action-dependent too.
         self.dmodel.fit(update_input[:, :-1], done, batch_size=self.batch_size,
                         epochs=1, verbose=0)
+
+
+''' 
+The following callback is not currently used, I was trying it out. 
+A simple way to print loss values is to set verbose to 1 or 2 in self.tmodel.fit. 
+But then it prints loss after every batch (too much printing, becomes unreadable).
+I think we should implement a print-out after N batches (for some reasonable N).
+Here's some code I found, but haven't checked it out. Should implement something like this type of callback:
+https://github.com/fchollet/keras/issues/2850
+'''
 
 class LossHistory(Callback):
     def on_train_begin(self, logs={}):
