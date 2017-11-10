@@ -159,10 +159,9 @@ class DQNAgent:
         # and do the model fit!
 
         self.qmodel.fit(update_input[:, :-1], target, batch_size=self.batch_size,
-                        epochs=1, verbose=0)
-
+                        epochs=1, verbose=0)    
         self.tmodel.fit(update_input, update_target, batch_size=self.batch_size,
-                        epochs=30,
+                        epochs=1,
                         verbose=0,
                         #callbacks=[history]
                         ) # TODO callback
