@@ -7,25 +7,9 @@ from collections import deque
 from keras.layers import Dense
 from keras.optimizers import Adam
 from keras.models import Sequential
-import matplotlib.pyplot as plt
-from keras.callbacks import Callback
+from keras.callbacks import TensorBoard
 
-EPISODES = 300
-
-
-class NBatchLogger(Callback):
-    def __init__(self, display=100):
-        # display: Number of batches to wait before outputting loss
-        self.seen = 0
-        self.display = display
-
-    def on_batch_end(self, batch, logs={}):
-        self.seen += logs.get('size', 0)
-        if self.seen % self.display == 0:
-            print('\n{0} - Batch Loss: {1}'.format(self.seen, self.params['metrics'][0]))
-
-
-out_batch = NBatchLogger(display=1000)
+EPISODES = 30
 
 
 # DQN Agent for the Cartpole
@@ -47,9 +31,9 @@ class DQNAgent:
         self.epsilon = 1.0
         self.epsilon_decay = 0.999
         self.epsilon_min = 0.01
-        self.batch_size = 64*3
+        self.batch_size = 64 * 3
         self.net_train_epochs = 3
-        self.train_start = 1000
+        self.train_start = 100
         # create replay memory using deque
         self.memory = deque(maxlen=2000)
 
@@ -65,6 +49,11 @@ class DQNAgent:
 
         if self.load_model:
             self.qmodel.load_weights("./save_model/cartpole_dqn.h5")
+
+        self.tensorboard = TensorBoard(log_dir='./logs',
+                                       histogram_freq=1,
+                                       write_graph=True,
+                                       write_images=False)
 
     # approximate Q function
     # state is input and Q Value of each action is output
@@ -114,7 +103,7 @@ class DQNAgent:
         dmodel = Sequential()
         dmodel.add(Dense(24, input_dim=self.state_size, activation='relu',
                          kernel_initializer='he_uniform'))
-        #dmodel.add(Dense(24, activation='relu',
+        # dmodel.add(Dense(24, activation='relu',
         #                 kernel_initializer='he_uniform'))
         dmodel.add(Dense(1, activation='sigmoid',
                          kernel_initializer='he_uniform'))
@@ -177,46 +166,30 @@ class DQNAgent:
         self.qmodel.fit(update_input[:, :-1], target, batch_size=batch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1)
+                        validation_split=0.1,  # callbacks=[self.tensorboard]
+                        )
 
         self.tmodel.fit(update_input, update_target, batch_size=batch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1,
-                        # callbacks=[out_batch],
-                        # metrics = ['accuracy']
-                        # callbacks=[history]
-                        ) # TODO callback
+                        validation_split=0.1, callbacks=[self.tensorboard]
+                        )
 
         train_history = self.rmodel.fit(update_input[:, :-1], reward, batch_size=batch_size,
-                        epochs=self.net_train_epochs,
-                        verbose=0,
-                        validation_split=0.1)  # TODO Currently predicts reward based on state input data. Should consider making reward predictions action-dependent too.
-
+                                        epochs=self.net_train_epochs,
+                                        verbose=0,
+                                        validation_split=0.1,# callbacks=[self.tensorboard]
+                                        )
+        # TODO Currently predicts reward based on state input data. Should consider making reward predictions action-dependent too.
+        # TODO Input dmodel into rmodel
         self.dmodel.fit(update_input[:, :-1], done, batch_size=batch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1)
+                        validation_split=0.1,  # callbacks=[self.tensorboard]
+                        )
+
         val_acc.append(train_history.history['val_acc'])
         return val_acc
-
-
-''' 
-The following callback is not currently used, I was trying it out. 
-A simple way to print loss values is to set verbose to 1 or 2 in self.tmodel.fit. 
-But then it prints loss after every batch (too much printing, becomes unreadable).
-I think we should implement a print-out after N batches (for some reasonable N).
-Here's some code I found, but haven't checked it out. Should implement something like this type of callback:
-https://github.com/fchollet/keras/issues/2850
-'''
-
-
-class LossHistory(Callback):
-    def on_train_begin(self, logs={}):
-        self.losses = []
-
-    def on_batch_end(self, batch, logs={}):
-        self.losses.append(logs.get('loss'))
 
 
 if __name__ == "__main__":
@@ -245,6 +218,7 @@ if __name__ == "__main__":
             action = agent.get_action(state)
             next_state, reward, done, info = env.step(action)
             next_state = np.reshape(next_state, [1, state_size])
+
             # if an action make the episode end, then gives penalty of -100
             reward = reward if not done or score == 499 else -100
 
