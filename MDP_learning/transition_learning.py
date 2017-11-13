@@ -117,22 +117,22 @@ class TLearner:
         self.tmodel.fit(update_input, update_target, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1,
-                        callbacks=[self.Ttensorboard]                        )
+                        validation_split=0.1,# callbacks=[self.Ttensorboard]
+                        )
 
         self.rmodel.fit(update_input[:, :-1], reward, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1,
-                        callbacks=[self.Rtensorboard])
+                        validation_split=0.1,# callbacks=[self.Rtensorboard]
+                        )
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
 
         self.dmodel.fit(update_input[:, :-1], done, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1,
-                        callbacks=[self.Dtensorboard])
+                        validation_split=0.1, callbacks=[self.Dtensorboard]
+                        )
 
     def fill_mem(self, environment):
         state = environment.reset()
