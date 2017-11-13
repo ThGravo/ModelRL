@@ -33,18 +33,9 @@ class ModelLearner:
         self.rmodel = self.build_rmodel()
         self.dmodel = self.build_dmodel()
 
-        self.Ttensorboard = TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()),
-                                        histogram_freq=1,
-                                        write_graph=True,
-                                        write_images=False)
-        self.Rtensorboard = TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()),
-                                        histogram_freq=1,
-                                        write_graph=True,
-                                        write_images=False)
-        self.Dtensorboard = TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()),
-                                        histogram_freq=1,
-                                        write_graph=True,
-                                        write_images=False)
+        self.Ttensorboard = TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))
+        self.Rtensorboard = TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))
+        self.Dtensorboard = TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))
 
     # approximate Transition function
     # state and action is input and successor state is output
@@ -80,8 +71,8 @@ class ModelLearner:
         dmodel = Sequential()
         dmodel.add(Dense(24, input_dim=self.state_size, activation='relu',
                          kernel_initializer='he_uniform'))
-        # dmodel.add(Dense(24, activation='relu',
-        #                 kernel_initializer='he_uniform'))
+        dmodel.add(Dense(24, activation='relu',
+                         kernel_initializer='he_uniform'))
         dmodel.add(Dense(1, activation='sigmoid',
                          kernel_initializer='he_uniform'))
         dmodel.summary()
@@ -119,18 +110,18 @@ class ModelLearner:
                         validation_split=0.1, callbacks=[self.Ttensorboard]
                         )
 
+        # TODO Currently predicts reward based on state input data.
+        #  Should we consider making reward predictions action-dependent too?
         self.rmodel.fit(update_input[:, :-1], reward, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1, #callbacks=[self.Rtensorboard]
+                        validation_split=0.1, callbacks=[self.Rtensorboard]
                         )
-        # TODO Currently predicts reward based on state input data.
-        #  Should we consider making reward predictions action-dependent too?
 
         self.dmodel.fit(update_input[:, :-1], done, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1, #callbacks=[self.Dtensorboard]
+                        validation_split=0.1, callbacks=[self.Dtensorboard]
                         )
 
     def fill_mem(self, environment):
