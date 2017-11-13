@@ -10,8 +10,7 @@ from keras.callbacks import TensorBoard
 
 EPISODES = 1
 
-
-class TLearner:
+class ModelLearner:
     def __init__(self, state_size, action_size):
         # if you want to see Cartpole learning, then change to True
         self.render = False
@@ -113,17 +112,17 @@ class TLearner:
             update_target[i] = mini_batch[i][3]
             done.append(mini_batch[i][4])
 
-        # and do the model fit!
+        # and do the model fit
         self.tmodel.fit(update_input, update_target, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1,# callbacks=[self.Ttensorboard]
+                        validation_split=0.1, callbacks=[self.Ttensorboard]
                         )
 
         self.rmodel.fit(update_input[:, :-1], reward, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1,# callbacks=[self.Rtensorboard]
+                        validation_split=0.1, #callbacks=[self.Rtensorboard]
                         )
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
@@ -131,7 +130,7 @@ class TLearner:
         self.dmodel.fit(update_input[:, :-1], done, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1, callbacks=[self.Dtensorboard]
+                        validation_split=0.1, #callbacks=[self.Dtensorboard]
                         )
 
     def fill_mem(self, environment):
@@ -155,14 +154,13 @@ class TLearner:
 
 
 if __name__ == "__main__":
-    # In case of CartPole-v1, maximum length of episode is 500
     env_name = 'CartPole-v1'
     env = gym.make(env_name)
     # get size of state and action from environment
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
-    agent = TLearner(state_size, action_size)
+    agent = ModelLearner(state_size, action_size)
 
     scores, episodes, val_accs, episodes_val = [], [], [], []
 
