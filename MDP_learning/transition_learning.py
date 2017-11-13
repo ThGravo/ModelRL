@@ -1,6 +1,7 @@
 import gym
 import random
 import numpy as np
+from time import time
 from collections import deque
 from keras.layers import Dense
 from keras.optimizers import Adam
@@ -8,6 +9,7 @@ from keras.models import Sequential
 from keras.callbacks import TensorBoard
 
 EPISODES = 1
+
 
 class TLearner:
     def __init__(self, state_size, action_size):
@@ -22,7 +24,7 @@ class TLearner:
         # These are hyper parameters
         self.learning_rate = 0.0001
         self.batch_size = 500
-        self.net_train_epochs = 1024
+        self.net_train_epochs = 128
         # create replay memory using deque
         self.mem_size = self.batch_size
         self.memory = deque(maxlen=self.mem_size)
@@ -32,10 +34,18 @@ class TLearner:
         self.rmodel = self.build_rmodel()
         self.dmodel = self.build_dmodel()
 
-        self.tensorboard = TensorBoard(log_dir='./log_tlearn',
-                                       histogram_freq=1,
-                                       write_graph=True,
-                                       write_images=False)
+        self.Ttensorboard = TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()),
+                                        histogram_freq=1,
+                                        write_graph=True,
+                                        write_images=False)
+        self.Rtensorboard = TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()),
+                                        histogram_freq=1,
+                                        write_graph=True,
+                                        write_images=False)
+        self.Dtensorboard = TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()),
+                                        histogram_freq=1,
+                                        write_graph=True,
+                                        write_images=False)
 
     # approximate Transition function
     # state and action is input and successor state is output
@@ -107,21 +117,22 @@ class TLearner:
         self.tmodel.fit(update_input, update_target, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1
-                        )
+                        validation_split=0.1,
+                        callbacks=[self.Ttensorboard]                        )
 
         self.rmodel.fit(update_input[:, :-1], reward, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
                         validation_split=0.1,
-                        callbacks=[self.tensorboard])
+                        callbacks=[self.Rtensorboard])
         # TODO Currently predicts reward based on state input data.
-        #  Should consider making reward predictions action-dependent too.
+        #  Should we consider making reward predictions action-dependent too?
 
         self.dmodel.fit(update_input[:, :-1], done, batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         verbose=0,
-                        validation_split=0.1)
+                        validation_split=0.1,
+                        callbacks=[self.Dtensorboard])
 
     def fill_mem(self, environment):
         state = environment.reset()
@@ -134,11 +145,13 @@ class TLearner:
             # get action for the current state and go one step in environment
             action = self.get_action(state)
             next_state, reward, done, info = environment.step(action)
-            next_state = np.reshape(next_state, [1, state_size])
             print(reward)
             # save the sample <s, a, r, s'> to the replay memory
-            self.memory.append((state, action, reward, next_state, done))
-            state = next_state
+            self.memory.append((state, action, reward, np.reshape(next_state, [1, state_size]), done))
+            if done:
+                state = environment.reset()
+            else:
+                state = next_state
 
 
 if __name__ == "__main__":
@@ -154,6 +167,8 @@ if __name__ == "__main__":
     scores, episodes, val_accs, episodes_val = [], [], [], []
 
     for e in range(EPISODES):
+        print('Filling Replay Memory...')
         agent.fill_mem(env)
+        print('Training...')
         agent.train_models(10)
         agent.memory.clear()
