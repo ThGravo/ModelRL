@@ -18,9 +18,9 @@ EPISODES = 300
 class DQNAgent:
     def __init__(self, state_size, action_size):
         # if you want to see Cartpole learning, then change to True
-        self.render = False
-        self.load_model = False
-        self.foie_gras = True
+        self.render = True
+        self.load_model = True
+        self.foie_gras = False
 
         # get size of state and action
         self.state_size = state_size
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     scores, episodes = [], []
 
     if agent.foie_gras:
-        for i in range(5):
+        for i in range(16):
             canary = ModelLearner(state_size, action_size)
             print('Filling Replay Memory...')
             canary.fill_mem(env)
@@ -149,6 +149,12 @@ if __name__ == "__main__":
                 next_state, reward, done = canary.step(state, action)
             else:
                 next_state, reward, done, info = env.step(action)
+
+            # next_state2, reward2, done2, info2 = env.step(action)
+            # assert type(next_state)==type(next_state2)
+            # assert type(reward2) == type(reward)
+            # assert type(done2) == type(done)
+
             next_state = np.reshape(next_state, [1, state_size])
             # if an action make the episode end, then gives penalty of -100
             reward = reward if not done or score == 499 else -100
