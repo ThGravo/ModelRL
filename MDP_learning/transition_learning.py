@@ -139,9 +139,6 @@ class ModelLearner:
         state = np.reshape(state, [1, self.state_size])
 
         for i in range(self.mem_size):
-            if self.render:
-                environment.render()
-
             # get action for the current state and go one step in environment
             action = self.get_action(state)
             next_state, reward, done, info = environment.step(action)
