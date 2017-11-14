@@ -8,21 +8,17 @@ from keras.optimizers import Adam
 from keras.models import Sequential
 from keras.callbacks import TensorBoard
 
-EPISODES = 1
 
 class ModelLearner:
     def __init__(self, state_size, action_size):
-        # if you want to see Cartpole learning, then change to True
-        self.render = False
-        self.load_model = False
 
         # get size of state and action
         self.state_size = state_size
         self.action_size = action_size
 
         # These are hyper parameters
-        self.learning_rate = 0.0001
-        self.batch_size = 500
+        self.learning_rate = 0.001
+        self.batch_size = 5000
         self.net_train_epochs = 128
         # create replay memory using deque
         self.mem_size = self.batch_size
@@ -84,7 +80,7 @@ class ModelLearner:
         return random.randrange(self.action_size)
 
     # pick samples randomly from replay memory (with batch_size)
-    def train_models(self, minibatch_size):
+    def train_models(self, minibatch_size=10):
         batch_size = min(self.batch_size, len(self.memory))
         minibatch_size = min(minibatch_size, batch_size)
 
@@ -124,9 +120,23 @@ class ModelLearner:
                         validation_split=0.1, callbacks=[self.Dtensorboard]
                         )
 
+    def step(self, state, action):
+        batch_size = 1;
+
+        # TODO definitely not the most pythonic way 
+        x = np.zeros((batch_size, self.state_size + 1))
+        x[0][:self.state_size] = np.reshape(state, [1, self.state_size])
+        x[0][-1] = action;
+
+        next_state = self.tmodel.predict(x, batch_size)
+        reward = self.rmodel.predict(x[:, :-1], batch_size)
+        done = self.dmodel.predict(x[:, :-1], batch_size)
+
+        return next_state, reward, done
+
     def fill_mem(self, environment):
         state = environment.reset()
-        state = np.reshape(state, [1, state_size])
+        state = np.reshape(state, [1, self.state_size])
 
         for i in range(self.mem_size):
             if self.render:
@@ -135,10 +145,12 @@ class ModelLearner:
             # get action for the current state and go one step in environment
             action = self.get_action(state)
             next_state, reward, done, info = environment.step(action)
-            print(reward)
+            print(info, reward)
+
             # save the sample <s, a, r, s'> to the replay memory
-            self.memory.append((state, action, reward, np.reshape(next_state, [1, state_size]), done))
-            if done:
+            self.memory.append((state, action, reward, np.reshape(next_state, [1, self.state_size]), done))
+
+            if done and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
                 state = environment.reset()
             else:
                 state = next_state
@@ -151,13 +163,13 @@ if __name__ == "__main__":
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
-    agent = ModelLearner(state_size, action_size)
-
     scores, episodes, val_accs, episodes_val = [], [], [], []
 
-    for e in range(EPISODES):
-        print('Filling Replay Memory...')
-        agent.fill_mem(env)
-        print('Training...')
-        agent.train_models(10)
-        agent.memory.clear()
+    canary = ModelLearner(state_size, action_size)
+
+    # for e in range(1):
+    print('Filling Replay Memory...')
+    canary.fill_mem(env)
+    print('Training...')
+    canary.train_models()
+    canary.memory.clear()
