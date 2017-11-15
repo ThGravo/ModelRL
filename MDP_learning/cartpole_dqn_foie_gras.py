@@ -18,9 +18,10 @@ EPISODES = 300
 class DQNAgent:
     def __init__(self, state_size, action_size):
         # if you want to see Cartpole learning, then change to True
-        self.render = True
-        self.load_model = True
-        self.foie_gras = False
+        self.replay = True
+        self.render = self.replay
+        self.load_model = self.replay
+        self.foie_gras = not self.replay
 
         # get size of state and action
         self.state_size = state_size
