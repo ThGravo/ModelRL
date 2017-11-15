@@ -52,9 +52,9 @@ class ModelLearner:
     # state is input and reward is output
     def build_rmodel(self):
         rmodel = Sequential()
-        rmodel.add(Dense(24, input_dim=self.state_size, activation='relu',
+        rmodel.add(Dense(24, input_dim=self.state_size, activation='sigmoid',
                          kernel_initializer='he_uniform'))
-        rmodel.add(Dense(24, activation='relu',
+        rmodel.add(Dense(24, activation='sigmoid',
                          kernel_initializer='he_uniform'))
         rmodel.add(Dense(1, activation='linear',
                          kernel_initializer='he_uniform'))
@@ -133,7 +133,8 @@ class ModelLearner:
         reward = self.rmodel.predict(x[:, :-1], batch_size)
         done = self.dmodel.predict(x[:, :-1], batch_size)
 
-        return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .5)
+        return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .8)
+        # TODO how sure do we want to be about being done? 80%? 90?
         # TODO yah to force the type to be the same as in gym environment
 
     def fill_mem(self, environment):
@@ -143,7 +144,7 @@ class ModelLearner:
             # get action for the current state and go one step in environment
             action = self.get_action(state)
             next_state, reward, done, info = environment.step(action)
-            print(info, reward)
+            #print(info, reward)
 
             # save the sample <s, a, r, s'> to the replay memory
             self.memory.append((np.reshape(state, [1, self.state_size]),
@@ -152,7 +153,7 @@ class ModelLearner:
                                 np.reshape(next_state, [1, self.state_size]),
                                 done*1))
 
-            if done and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
+            if done: # and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
                 state = environment.reset()
             else:
                 state = next_state
@@ -169,7 +170,7 @@ if __name__ == "__main__":
 
     canary = ModelLearner(state_size, action_size)
 
-    for e in range(2):
+    for e in range(8):
         print('Filling Replay Memory...')
         canary.fill_mem(env)
         print('Training...')
@@ -185,7 +186,7 @@ if __name__ == "__main__":
 
     states.append(state)
 
-    while episode_number <= 150:
+    while episode_number <= 500:
         action = 1 if np.random.uniform() < .5 else 0
 
         next_state, reward, done = canary.step(state, action)
@@ -207,7 +208,6 @@ if __name__ == "__main__":
 
     p = np.asarray(nexts_pred)
     r = np.asarray(nexts_real)
-    """"""
     for i in range(4):
         plt.figure(i)
         plt.plot(p[:, i])
