@@ -11,16 +11,17 @@ from keras.callbacks import TensorBoard
 
 
 class ModelLearner:
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, num_discrete_actions, action_size=1):
 
         # get size of state and action
         self.state_size = state_size
         self.action_size = action_size
+        self.action_num = num_discrete_actions
 
         # These are hyper parameters
         self.learning_rate = 0.001
-        self.batch_size = 8000
-        self.net_train_epochs = 16
+        self.batch_size = 16000
+        self.net_train_epochs = 32
         # create replay memory using deque
         self.mem_size = self.batch_size
         self.memory = deque(maxlen=self.mem_size)
@@ -38,9 +39,9 @@ class ModelLearner:
     # state and action is input and successor state is output
     def build_tmodel(self):
         tmodel = Sequential()
-        tmodel.add(Dense(24, input_dim=self.state_size + 1, activation='relu',
+        tmodel.add(Dense(self.state_size * 6, input_dim=self.state_size + self.action_size, activation='relu',
                          kernel_initializer='he_uniform'))
-        tmodel.add(Dense(24, activation='relu',
+        tmodel.add(Dense(self.state_size * 4, activation='relu',
                          kernel_initializer='he_uniform'))
         tmodel.add(Dense(self.state_size, activation='linear',
                          kernel_initializer='he_uniform'))
@@ -52,9 +53,9 @@ class ModelLearner:
     # state is input and reward is output
     def build_rmodel(self):
         rmodel = Sequential()
-        rmodel.add(Dense(24, input_dim=self.state_size, activation='sigmoid',
+        rmodel.add(Dense(self.state_size * 4, input_dim=self.state_size, activation='sigmoid',
                          kernel_initializer='he_uniform'))
-        rmodel.add(Dense(24, activation='sigmoid',
+        rmodel.add(Dense(self.state_size * 4, activation='sigmoid',
                          kernel_initializer='he_uniform'))
         rmodel.add(Dense(1, activation='linear',
                          kernel_initializer='he_uniform'))
@@ -66,9 +67,9 @@ class ModelLearner:
     # state is input and reward is output
     def build_dmodel(self):
         dmodel = Sequential()
-        dmodel.add(Dense(24, input_dim=self.state_size, activation='relu',
+        dmodel.add(Dense(self.state_size * 4, input_dim=self.state_size, activation='relu',
                          kernel_initializer='he_uniform'))
-        dmodel.add(Dense(24, activation='relu',
+        dmodel.add(Dense(self.state_size * 4, activation='relu',
                          kernel_initializer='he_uniform'))
         dmodel.add(Dense(1, activation='sigmoid',
                          kernel_initializer='he_uniform'))
@@ -78,60 +79,50 @@ class ModelLearner:
 
     # get action from model using random policy
     def get_action(self, state):
-        return random.randrange(self.action_size)
+        return random.randrange(self.action_num)
 
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
-        batch_size = min(self.batch_size, len(self.memory))
+        batch_size = len(self.memory)
         minibatch_size = min(minibatch_size, batch_size)
 
-        mini_batch = list(self.memory)
-
-        update_input = np.zeros(
-            (batch_size, self.state_size + 1))  # TODO action repesentation & corresponding network architecture
-        update_target = np.zeros((batch_size, self.state_size))
-        action, reward, done = [], [], []
-
-        for i in range(batch_size):
-            update_input[i][:self.state_size] = mini_batch[i][0]
-            update_input[i][-1] = mini_batch[i][1]
-            action.append(mini_batch[i][1])
-            reward.append(mini_batch[i][2])
-            update_target[i] = mini_batch[i][3]
-            done.append(mini_batch[i][4])
+        batch = np.array(self.memory)
 
         # and do the model fit
-        self.tmodel.fit(update_input, update_target, batch_size=minibatch_size,
+        self.tmodel.fit(batch[:, :self.state_size + self.action_size],
+                        batch[:, -self.state_size-1:-1],
+                        batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
-                        verbose=0,
-                        validation_split=0.1, callbacks=[self.Ttensorboard]
+                        validation_split=0.1,
+                        callbacks=[self.Ttensorboard]
                         )
 
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
-        self.rmodel.fit(update_input[:, :-1], reward, batch_size=minibatch_size,
+        self.rmodel.fit(batch[:, :self.state_size],
+                        batch[:, self.state_size + self.action_size],
+                        batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
-                        verbose=0,
-                        validation_split=0.1, callbacks=[self.Rtensorboard]
+                        validation_split=0.1,
+                        callbacks=[self.Rtensorboard]
                         )
 
-        self.dmodel.fit(update_input[:, :-1], done, batch_size=minibatch_size,
+        self.dmodel.fit(batch[:, :self.state_size],
+                        batch[:, -1],
+                        batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
-                        verbose=0,
-                        validation_split=0.1, callbacks=[self.Dtensorboard]
+                        validation_split=0.1,
+                        callbacks=[self.Dtensorboard]
                         )
 
     def step(self, state, action):
         batch_size = 1
+        state = np.reshape(state, [1, self.state_size])
+        action = np.reshape(action, [1, self.action_size])
 
-        # TODO definitely not the most pythonic way 
-        x = np.zeros((batch_size, self.state_size + 1))
-        x[0][:self.state_size] = np.reshape(state, [1, self.state_size])
-        x[0][-1] = action
-
-        next_state = self.tmodel.predict(x, batch_size)
-        reward = self.rmodel.predict(x[:, :-1], batch_size)
-        done = self.dmodel.predict(x[:, :-1], batch_size)
+        next_state = self.tmodel.predict(np.hstack((state, action)), batch_size)
+        reward = self.rmodel.predict(state, batch_size)
+        done = self.dmodel.predict(state, batch_size)
 
         return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .8)
         # TODO how sure do we want to be about being done? 80%? 90?
@@ -144,16 +135,14 @@ class ModelLearner:
             # get action for the current state and go one step in environment
             action = self.get_action(state)
             next_state, reward, done, info = environment.step(action)
-            #print(info, reward)
+            # print(info, reward)
 
             # save the sample <s, a, r, s'> to the replay memory
-            self.memory.append((np.reshape(state, [1, self.state_size]),
-                                action,
-                                reward,
-                                np.reshape(next_state, [1, self.state_size]),
-                                done*1))
+            self.memory.append(np.hstack(
+                (state, action, reward, next_state, done * 1)
+            ))
 
-            if done: # and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
+            if done:  # and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
                 state = environment.reset()
             else:
                 state = next_state
@@ -161,16 +150,15 @@ class ModelLearner:
 
 if __name__ == "__main__":
     env_name = 'CartPole-v1'
+    env_name = 'LunarLander-v2'
     env = gym.make(env_name)
     # get size of state and action from environment
-    state_size = env.observation_space.shape[0]
-    action_size = env.action_space.n
+    state_size = sum(env.observation_space.shape)
+    num_discrete_actions = env.action_space.n
 
-    scores, episodes, val_accs, episodes_val = [], [], [], []
+    canary = ModelLearner(state_size, num_discrete_actions)
 
-    canary = ModelLearner(state_size, action_size)
-
-    for e in range(8):
+    for e in range(16):
         print('Filling Replay Memory...')
         canary.fill_mem(env)
         print('Training...')
@@ -179,6 +167,7 @@ if __name__ == "__main__":
 
     '''Evaluation'''
     episode_number = 1
+    scores, episodes, val_accs, episodes_val = [], [], [], []
 
     states, nexts_real, nexts_pred, rewards_real, rewards_pred, dones_real, dones_pred = [], [], [], [], [], [], []
 
@@ -208,33 +197,16 @@ if __name__ == "__main__":
 
     p = np.asarray(nexts_pred)
     r = np.asarray(nexts_real)
-    for i in range(4):
+    for i in range(state_size):
         plt.figure(i)
         plt.plot(p[:, i])
         plt.plot(r[:, i])
-    plt.figure(4)
+    plt.figure(state_size+1)
     plt.plot(rewards_pred)
     plt.plot(rewards_real)
-    plt.figure(5)
+    plt.figure(state_size+2)
     plt.plot(dones_pred)
     plt.plot(dones_real)
 
-    #plt.tight_layout()
+    # plt.tight_layout()
     plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
