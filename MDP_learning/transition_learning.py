@@ -36,9 +36,9 @@ class ModelLearner:
                                                   activations=('sigmoid', 'sigmoid'))
         self.dmodel = self.build_dmodel(state_size)
 
-        self.Ttensorboard = [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
-        self.Rtensorboard = [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
-        self.Dtensorboard = [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
+        self.Ttensorboard = [] # [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
+        self.Rtensorboard = [] # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
+        self.Dtensorboard = [] # [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
 
     # approximate Transition function
     # state and action is input and successor state is output
