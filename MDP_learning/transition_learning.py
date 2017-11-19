@@ -75,8 +75,8 @@ class ModelLearner:
         return model
 
     # get action from model using random policy
-    def get_action(self, state):
-        return random.randrange(self.action_num)
+    def get_action(self, state, env):
+        return env.action_space.sample()# random.randrange(self.action_num)
 
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
@@ -127,7 +127,7 @@ class ModelLearner:
 
         for i in range(self.mem_size):
             # get action for the current state and go one step in environment
-            action = self.get_action(state)
+            action = self.get_action(state, environment)
             next_state, reward, done, info = environment.step(action)
 
             # save the sample <s, a, r, s'> to the replay memory
@@ -140,9 +140,9 @@ class ModelLearner:
 
     def run(self, environment, rounds=1):
         for e in range(rounds):
-            print('Filling Replay Memory...')
+            #print('Filling Replay Memory...')
             self.fill_mem(environment)
-            print('Training...')
+            #print('Training...')
             self.train_models()
             self.memory.clear()
 
@@ -152,7 +152,7 @@ class ModelLearner:
         states.append(state)
 
         for episode_number in range(5000):
-            action = self.get_action(state)
+            action = self.get_action(state,environment)
 
             next_state, reward, done = self.step(state, action)
 
