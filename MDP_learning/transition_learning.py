@@ -1,13 +1,17 @@
-import gym
-import random
-import numpy as np
-import matplotlib.pyplot as plt
-from time import time
+import tensorflow as tf
 from collections import deque
 from keras.layers import Dense
 from keras.optimizers import Adam
 from keras.models import Sequential
 from keras.callbacks import TensorBoard
+import gym
+import random
+import numpy as np
+import matplotlib
+matplotlib.use('GTK3Cairo', warn=False, force=True)
+import matplotlib.pyplot as plt
+from time import time
+
 
 
 class ModelLearner:
