@@ -3,3 +3,5 @@
 /MDP_learning/save_graph/*.png
 /MDP_learning/save_model/*.h5
 __pycache__
+*.h5f
+*.json
