@@ -8,10 +8,9 @@ import gym
 import random
 import numpy as np
 import matplotlib
-matplotlib.use('GTK3Cairo', warn=False, force=True)
-import matplotlib.pyplot as plt
-from time import time
 
+#matplotlib.use('GTK3Cairo', warn=False, force=True)
+import matplotlib.pyplot as plt
 
 
 class ModelLearner:
@@ -56,10 +55,10 @@ class ModelLearner:
         model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
         for i in range(len(dim_multipliers) - 1):
             model.add(Dense(self.state_size * dim_multipliers[i + 1],
-                            activation=activations[min(i + 1, len(activations)-1)]))
+                            activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        #model.summary()
+        # model.summary()
         return model
 
     # approximate Done value
@@ -75,12 +74,12 @@ class ModelLearner:
             model.add(Dense(self.state_size * dim_multipliers[i + 1], activation=activations[i + 1]))
         model.add(Dense(1, activation='sigmoid'))
         model.compile(loss='binary_crossentropy', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        #model.summary()
+        # model.summary()
         return model
 
     # get action from model using random policy
     def get_action(self, state, env):
-        return env.action_space.sample()# random.randrange(self.action_num)
+        return env.action_space.sample()  # random.randrange(self.action_num)
 
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
@@ -144,9 +143,9 @@ class ModelLearner:
 
     def run(self, environment, rounds=1):
         for e in range(rounds):
-            #print('Filling Replay Memory...')
+            # print('Filling Replay Memory...')
             self.fill_mem(environment)
-            #print('Training...')
+            # print('Training...')
             self.train_models()
             self.memory.clear()
 
@@ -156,7 +155,7 @@ class ModelLearner:
         states.append(state)
 
         for episode_number in range(5000):
-            action = self.get_action(state,environment)
+            action = self.get_action(state, environment)
 
             next_state, reward, done = self.step(state, action)
 
@@ -194,12 +193,13 @@ class ModelLearner:
 
 
 if __name__ == "__main__":
-    for env_name in ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:
+    for env_name in ["Pong-ram-v4"]:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:
         env = gym.make(env_name)
         # get size of state and action from environment
         state_size = sum(env.observation_space.shape)
         num_discrete_actions = env.action_space.n
 
-        canary = ModelLearner(state_size, num_discrete_actions)
-        canary.run(env)
+        canary = ModelLearner(state_size, num_discrete_actions, tmodel_dim_multipliers=(12, 4))
+        canary.batch_size = 100000
+        canary.run(env, rounds=8)
         print('MSE: {}'.format(canary.evaluate(env)))
