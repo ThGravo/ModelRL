@@ -33,7 +33,7 @@ def evaluate_single(args):
     weightedMSE = 0
     weights = [1 / 0.0268, 1 / .000004186, 1 / 0.017888, 1 / 0.0007178]
     env_names = ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']
-    env_names = ['Pong-ram-v0']
+    env_names = ['Pong-ram-v4']
     for env_name, weight in zip(env_names, weights):
         MSEs = []
         for i in range(N_RUNS):
