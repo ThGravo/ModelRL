@@ -55,43 +55,17 @@ nb_actions = env.action_space.n
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
 input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
 
-if False:
-    model = Sequential()
-    if K.image_dim_ordering() == 'tf':
-        # (width, height, channels)
-        model.add(Permute((2, 3, 1), input_shape=input_shape))
-    elif K.image_dim_ordering() == 'th':
-        # (channels, width, height)
-        model.add(Permute((1, 2, 3), input_shape=input_shape))
-    else:
-        raise RuntimeError('Unknown image_dim_ordering.')
+image_in = Input(shape=input_shape, name='main_input')
+input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
+conv1 = Convolution2D(32, 8, 8, subsample=(4, 4), activation='relu')(input_perm)
+conv2 = Convolution2D(64, 4, 4, subsample=(2, 2), activation='relu')(conv1)
+conv3 = Convolution2D(64, 3, 3, subsample=(1, 1), activation='relu')(conv2)
+conv_out = Flatten()(conv3)
+dense_out = Dense(512, activation='relu')(conv_out)
+q_out = Dense(nb_actions, activation='linear')(dense_out)
+model = Model(inputs=[image_in], outputs=[q_out])
 
-    model.add(Convolution2D(32, 8, 8, subsample=(4, 4)))
-    model.add(Activation('relu'))
-    model.add(Convolution2D(64, 4, 4, subsample=(2, 2)))
-    model.add(Activation('relu'))
-    model.add(Convolution2D(64, 3, 3, subsample=(1, 1)))
-    model.add(Activation('relu'))
-    model.add(Flatten())
-    model.add(Dense(512))
-    model.add(Activation('relu'))
-    model.add(Dense(nb_actions))
-    model.add(Activation('linear'))
-    print(model.summary())
-
-else:
-    image_in = Input(shape=input_shape, name='main_input')
-    input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
-    conv1 = Convolution2D(32, 8, 8, subsample=(4, 4), activation='relu')(input_perm)
-    conv2 = Convolution2D(64, 4, 4, subsample=(2, 2), activation='relu')(conv1)
-    conv3 = Convolution2D(64, 3, 3, subsample=(1, 1), activation='relu')(conv2)
-    conv_out = Flatten()(conv3)
-    dense_out = Dense(512, activation='relu')(conv_out)
-
-    q_out = Dense(nb_actions, activation='linear')(dense_out)
-    model = Model(inputs=[image_in], outputs=[q_out])
-
-    print(model.summary())
+print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!

@@ -131,7 +131,7 @@ if __name__ == "__main__":
             print('Filling Replay Memory...')
             canary.fill_mem(env)
             print('Training...')
-            canary.train_models()
+            canary.train_model()
             canary.memory.clear()
 
     for e in range(EPISODES):

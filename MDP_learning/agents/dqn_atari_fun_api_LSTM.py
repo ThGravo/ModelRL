@@ -21,6 +21,7 @@ img_rows, img_cols = 84, 84
 INPUT_SHAPE = (img_rows, img_cols)
 WINDOW_LENGTH = 1
 
+# IMAGE PRE-PROCESSING
 
 class AtariProcessor(Processor):
     def process_observation(self, observation):
@@ -41,6 +42,7 @@ class AtariProcessor(Processor):
     def process_reward(self, reward):
         return np.clip(reward, -1., 1.)
 
+# PARSING ARGUMENTS
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', choices=['train', 'test'], default='train')
@@ -54,9 +56,11 @@ np.random.seed(123)
 env.seed(123)
 nb_actions = env.action_space.n
 
+
+
+
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
-input_shape = (img_rows, img_cols, 1)
-input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
+input_shape = (1, img_rows, img_cols)
 
 image_in = Input(shape=input_shape, name='main_input')
 if K.image_dim_ordering() == 'tf':
