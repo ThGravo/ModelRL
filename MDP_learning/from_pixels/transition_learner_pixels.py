@@ -90,11 +90,11 @@ class ModelLearner():
         q_out = Dense(self.action_num, activation='linear')(lstm_out)
 
         # Specify input and outputs for model
-        model = Model(inputs=[image_in, action_in], outputs=[state_pred, q_out])
-        print(model.summary())
-        model.compile(loss='mse', optimizer='adam', metrics=['accuracy'])
+        mt_model = Model(inputs=[image_in, action_in], outputs=[state_pred, q_out])
+        print(mt_model.summary())
+        mt_model.compile(loss='mse', optimizer='adam', metrics=['accuracy'])
 
-        return model
+        return mt_model
 
     def build_model(self, state_shape, action_shape):
         image_in = Input(shape=state_shape, name='image_input')
@@ -120,7 +120,8 @@ class ModelLearner():
         q_out = Dense(self.action_num, activation='linear')(dense_out)
 
         # Specify input and outputs for model
-        model = Model(inputs=[image_in, action_in], outputs=[state_pred, q_out])
+        model = Model(inputs=[image_in, action_in], outputs=[state_pred])
+                    #outputs=[state_pred, q_out]) # TODO: Bring back Q-learning
         print(model.summary())
         model.compile(loss='mse', optimizer='adam', metrics=['accuracy'])
 
@@ -172,6 +173,22 @@ if __name__ == "__main__":
         for epoch in range(epochs):
             # fill batch with rollouts
             states, actions, rewards = get_rollouts(env, batch_size, seed=epoch)
+            # iterate over rollouts
+            for rollout_num in range(batch_size):
+            # iterate over states in rollout
+                for i in range(len(states[rollout_num])-1):
+                    state1 = np.reshape(states[rollout_num][i], (1,) + states[rollout_num][i].shape)
+                    state2 = np.reshape(states[rollout_num][i+1], (1,) + states[rollout_num][i+1].shape)
+                    states_tr = np.concatenate((state1,state2),axis=0)
+                    action = np.reshape(actions[rollout_num][i], (1,) + actions[rollout_num][i].shape)
+                    # get label for state prediction
+                    target = agent.model.predict([state1, action], batch_size=1)
+                    agent.model.fit([states_tr,action],
+                              [target],
+                              batch_size=1,
+                              #validation_split=0.1,
+                              verbose=1)
+            '''
             get_layer_output = K.function([agent.model.layers[0].input, agent.model.layers[8].input],
                                           [agent.model.layers[11].output])
             layer_output = get_layer_output([states, actions])
@@ -188,5 +205,6 @@ if __name__ == "__main__":
                       batch_size=batch_size,
                       validation_split=0.1,
                       verbose=0)
+            '''
 
-            print('MSE: {}'.format(model.evaluate(env)))
+            #print('MSE: {}'.format(agent.model.evaluate(env)))
