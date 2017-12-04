@@ -134,47 +134,49 @@ if args.mode == 'train':
         actions = np.empty((batch_size, sequence_length, 1), dtype=np.float32)
         next_hstate = np.empty((batch_size, int(np.prod(conv3.shape[1:]))), dtype=np.float32)
 
-        starts = [random.randrange(data_size - (sequence_length + 1)) for i in range(batch_size)]
-        idxs = [i + j for i in starts for j in range(sequence_length + 1)]
-        n_samples = batch_size * (sequence_length + 1)
-        experiences = dqn.memory.sample(n_samples, idxs)
+        #starts = [random.randrange(data_size - (sequence_length + 1)) for i in range(batch_size)]
+        #idxs = [i + j for i in starts for j in range(sequence_length + 1)]
+        #n_samples = batch_size * (sequence_length + 1)
+        #experiences = dqn.memory.sample(n_samples, idxs)
 
         curr_batch = 0
-        for jj in range(0, n_samples, sequence_length + 1):
-            # TODO check for terminals
-            # while not terminal1_batch[max(0, start - 1):start + sequence_length].all():
-            #    start = random.randrange(data_size - sequence_length)
+        #for jj in range(0, n_samples, sequence_length + 1):
+        for jj in range(batch_size):
+            # check for terminals
+            start = random.randrange(data_size - (sequence_length + 1))
+            experiences = dqn.memory.sample(sequence_length + 1, range(start, start+sequence_length+1))
+            while np.array([e.terminal1 for e in experiences]).any():
+                start = random.randrange(data_size - (sequence_length + 1))
+                experiences = dqn.memory.sample(sequence_length + 1, range(start, start + sequence_length + 1))
 
             # Start by extracting the necessary parameters (we use a vectorized implementation).
-            state0_batch = []
+            state0_seq = []
             # state1_batch = []
             # reward_batch = []
             action_batch = []
-            terminal1_batch = []
-            for e in experiences[jj:jj + sequence_length + 1]:
-                state0_batch.append(e.state0)
+            #terminal1_batch = []
+            # for e in experiences[jj:jj + sequence_length + 1]:
+            for e in experiences:
+                state0_seq.append(e.state0)
                 # state1_batch.append(e.state1)
                 # reward_batch.append(e.reward)
                 action_batch.append(e.action)
-                terminal1_batch.append(e.terminal1)
+                #terminal1_batch.append(e.terminal1)
 
-            state0_batch = dqn.process_state_batch(state0_batch)
+            state0_seq = dqn.process_state_batch(state0_seq)
             # state1_batch = dqn.process_state_batch(state1_batch)
             # reward_batch = np.array(reward_batch)
             action_batch = np.array(action_batch, dtype=np.float32)
-            terminal1_batch = np.array(terminal1_batch)
-            # TODO not that easy with preallocating
-            # if terminal1_batch[:-1].any():
-            #    continue
+            #terminal1_batch = np.array(terminal1_batch)
 
-            hidden_states0 = model_truncated.predict_on_batch(state0_batch)
+            hidden_states0 = model_truncated.predict_on_batch(state0_seq)
 
             hstates[curr_batch, ...] = hidden_states0[np.newaxis, :-1, :]
             actions[curr_batch, ...] = np.expand_dims(np.expand_dims(action_batch[:-1], axis=0), axis=2)
             next_hstate[curr_batch, ...] = hidden_states0[np.newaxis, -1, :]
             curr_batch += 1
 
-        ml_model.fit([hstates, actions], next_hstate, verbose=1, epochs=8,
+        ml_model.fit([hstates, actions], next_hstate, verbose=1,# epochs=8,
                      callbacks=[TensorBoard(log_dir='./logs/Tlearn')])
 
 
