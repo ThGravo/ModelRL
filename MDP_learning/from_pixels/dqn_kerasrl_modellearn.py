@@ -115,7 +115,7 @@ if args.mode == 'train':
     log_filename = 'dqn_{}_log.json'.format(args.env_name)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
     callbacks += [FileLogger(log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=10000, log_interval=10000)
+    dqn.fit(env, callbacks=callbacks, nb_steps=100000, log_interval=10000)
 
     # After training is done, we save the final weights one more time.
     dqn.save_weights(weights_filename, overwrite=True)
@@ -127,24 +127,24 @@ if args.mode == 'train':
     print(model_truncated.summary())
 
     data_size = dqn.memory.observations.length
-    batch_size = 1000
-    n_epochs = 3*round(data_size/batch_size) # go through data 3 times
-    for ii in range(1):
+    batch_size = 10000
+    n_epochs = 3 * round(data_size / batch_size)  # go through data 3 times
+    for ii in range(n_epochs):
         hstates = np.empty((batch_size, sequence_length, int(np.prod(conv3.shape[1:]))), dtype=np.float32)
         actions = np.empty((batch_size, sequence_length, 1), dtype=np.float32)
         next_hstate = np.empty((batch_size, int(np.prod(conv3.shape[1:]))), dtype=np.float32)
 
-        #starts = [random.randrange(data_size - (sequence_length + 1)) for i in range(batch_size)]
-        #idxs = [i + j for i in starts for j in range(sequence_length + 1)]
-        #n_samples = batch_size * (sequence_length + 1)
-        #experiences = dqn.memory.sample(n_samples, idxs)
+        # starts = [random.randrange(data_size - (sequence_length + 1)) for i in range(batch_size)]
+        # idxs = [i + j for i in starts for j in range(sequence_length + 1)]
+        # n_samples = batch_size * (sequence_length + 1)
+        # experiences = dqn.memory.sample(n_samples, idxs)
 
         curr_batch = 0
-        #for jj in range(0, n_samples, sequence_length + 1):
+        # for jj in range(0, n_samples, sequence_length + 1):
         for jj in range(batch_size):
             # check for terminals
             start = random.randrange(data_size - (sequence_length + 1))
-            experiences = dqn.memory.sample(sequence_length + 1, range(start, start+sequence_length+1))
+            experiences = dqn.memory.sample(sequence_length + 1, range(start, start + sequence_length + 1))
             while np.array([e.terminal1 for e in experiences]).any():
                 start = random.randrange(data_size - (sequence_length + 1))
                 experiences = dqn.memory.sample(sequence_length + 1, range(start, start + sequence_length + 1))
@@ -154,20 +154,20 @@ if args.mode == 'train':
             # state1_batch = []
             # reward_batch = []
             action_batch = []
-            #terminal1_batch = []
+            # terminal1_batch = []
             # for e in experiences[jj:jj + sequence_length + 1]:
             for e in experiences:
                 state0_seq.append(e.state0)
                 # state1_batch.append(e.state1)
                 # reward_batch.append(e.reward)
                 action_batch.append(e.action)
-                #terminal1_batch.append(e.terminal1)
+                # terminal1_batch.append(e.terminal1)
 
             state0_seq = dqn.process_state_batch(state0_seq)
             # state1_batch = dqn.process_state_batch(state1_batch)
             # reward_batch = np.array(reward_batch)
             action_batch = np.array(action_batch, dtype=np.float32)
-            #terminal1_batch = np.array(terminal1_batch)
+            # terminal1_batch = np.array(terminal1_batch)
 
             hidden_states0 = model_truncated.predict_on_batch(state0_seq)
 
@@ -176,7 +176,7 @@ if args.mode == 'train':
             next_hstate[curr_batch, ...] = hidden_states0[np.newaxis, -1, :]
             curr_batch += 1
 
-        ml_model.fit([hstates, actions], next_hstate, verbose=1,# epochs=8,
+        ml_model.fit([hstates, actions], next_hstate, verbose=1,  # epochs=8,
                      callbacks=[TensorBoard(log_dir='./logs/Tlearn')])
 
 
