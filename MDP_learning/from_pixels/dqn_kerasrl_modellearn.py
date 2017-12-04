@@ -151,7 +151,7 @@ if args.mode == 'train':
             # state1_batch = []
             reward_seq = []
             action_seq = []
-            terminal1_seq = []
+            terminal1_seq = [] 
 
             for e in experiences:
                 state0_seq.append(e.state0)
