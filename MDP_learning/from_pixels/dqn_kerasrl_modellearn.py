@@ -79,8 +79,10 @@ action_in_reshape = Reshape((sequence_length, 1))(action_in)
 enc_state_and_action = concatenate([enc_state, action_in_reshape], name='encoded_state_and_action')
 lstm_out = LSTM(512)(enc_state_and_action)
 state_pred = Dense(int(np.prod(conv3.shape[1:])), activation='relu', name='predicted_next_state')(lstm_out)
-ml_model = Model(inputs=[enc_state, action_in], outputs=[state_pred])
-ml_model.compile('rmsprop', 'mae', metrics=['accuracy'])
+reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
+terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(lstm_out)
+ml_model = Model(inputs=[enc_state, action_in], outputs=[state_pred, reward_pred, terminal_pred])
+ml_model.compile('rmsprop', loss={'predicted_next_state': 'mae', 'predicted_reward': 'mse', 'predicted_terminal': 'binary_crossentropy'}, metrics=['accuracy'])
 print(ml_model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
@@ -103,7 +105,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
-               processor=processor, nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
+               processor=processor, nb_steps_warmup=10000, gamma=.99, target_model_update=10000,
                train_interval=4, delta_clip=1.)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
@@ -115,7 +117,7 @@ if args.mode == 'train':
     log_filename = 'dqn_{}_log.json'.format(args.env_name)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
     callbacks += [FileLogger(log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=100000, log_interval=10000)
+    dqn.fit(env, callbacks=callbacks, nb_steps=30000, log_interval=10000)
 
     # After training is done, we save the final weights one more time.
     dqn.save_weights(weights_filename, overwrite=True)
@@ -128,19 +130,14 @@ if args.mode == 'train':
 
     data_size = dqn.memory.observations.length
     batch_size = 10000
-    n_epochs = 3 * round(data_size / batch_size)  # go through data 3 times
+    n_epochs = 1 # 9 * round(data_size / batch_size)  # go through data 3 times
     for ii in range(n_epochs):
         hstates = np.empty((batch_size, sequence_length, int(np.prod(conv3.shape[1:]))), dtype=np.float32)
         actions = np.empty((batch_size, sequence_length, 1), dtype=np.float32)
         next_hstate = np.empty((batch_size, int(np.prod(conv3.shape[1:]))), dtype=np.float32)
+        rewards = np.empty((batch_size, 1), dtype=np.float32)
+        terminals = np.empty((batch_size, 1), dtype=np.float32)
 
-        # starts = [random.randrange(data_size - (sequence_length + 1)) for i in range(batch_size)]
-        # idxs = [i + j for i in starts for j in range(sequence_length + 1)]
-        # n_samples = batch_size * (sequence_length + 1)
-        # experiences = dqn.memory.sample(n_samples, idxs)
-
-        curr_batch = 0
-        # for jj in range(0, n_samples, sequence_length + 1):
         for jj in range(batch_size):
             # check for terminals
             start = random.randrange(data_size - (sequence_length + 1))
@@ -152,33 +149,93 @@ if args.mode == 'train':
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_seq = []
             # state1_batch = []
-            # reward_batch = []
-            action_batch = []
-            # terminal1_batch = []
-            # for e in experiences[jj:jj + sequence_length + 1]:
+            reward_seq = []
+            action_seq = []
+            terminal1_seq = []
+
             for e in experiences:
                 state0_seq.append(e.state0)
                 # state1_batch.append(e.state1)
-                # reward_batch.append(e.reward)
-                action_batch.append(e.action)
-                # terminal1_batch.append(e.terminal1)
+                reward_seq.append(e.reward)
+                action_seq.append(e.action)
+                terminal1_seq.append(e.terminal1)
 
             state0_seq = dqn.process_state_batch(state0_seq)
             # state1_batch = dqn.process_state_batch(state1_batch)
-            # reward_batch = np.array(reward_batch)
-            action_batch = np.array(action_batch, dtype=np.float32)
-            # terminal1_batch = np.array(terminal1_batch)
+            reward_seq = np.array(reward_seq)
+            action_seq = np.array(action_seq, dtype=np.float32)
+            terminal1_seq = np.array(terminal1_seq)
 
-            hidden_states0 = model_truncated.predict_on_batch(state0_seq)
+            hidden_states_seq = model_truncated.predict_on_batch(state0_seq)
 
-            hstates[curr_batch, ...] = hidden_states0[np.newaxis, :-1, :]
-            actions[curr_batch, ...] = np.expand_dims(np.expand_dims(action_batch[:-1], axis=0), axis=2)
-            next_hstate[curr_batch, ...] = hidden_states0[np.newaxis, -1, :]
-            curr_batch += 1
+            hstates[jj, ...] = hidden_states_seq[np.newaxis, :-1, :]
+            actions[jj, ...] = action_seq[np.newaxis, :-1, np.newaxis]
+            next_hstate[jj, ...] = hidden_states_seq[np.newaxis, -1, :]
+            rewards[jj, ...] = reward_seq[np.newaxis, -1]
+            terminals[jj, ...] = terminal1_seq[np.newaxis, -1]
 
-        ml_model.fit([hstates, actions], next_hstate, verbose=1,  # epochs=8,
+        ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], verbose=1,  # epochs=8,
                      callbacks=[TensorBoard(log_dir='./logs/Tlearn')])
 
+    ########################################################################################################################
+    from collections import deque
+
+    class synthEnv():
+        def __init__(self, tmodel, conv_model, real_env, sequence_len):
+            self.seq_len=sequence_length
+            self.tmodel = tmodel
+            self.conv_model = conv_model
+            self.real_env = real_env
+            self.action_space = real_env.action_space
+            self.observation_space = int(np.prod(conv3.shape[1:]))
+            self.state_seq = deque(maxlen=sequence_len)
+
+        def init_state(self):
+            self.real_env.reset()
+            images = []
+            for _ in range(self.seq_len+WINDOW_LENGTH):
+                images.append(self.real_env.action_space.sample())
+
+            stacked_images = np.empty((sequence_length, WINDOW_LENGTH), dtype=np.float32)
+            for i in range(self.seq_len):
+                stacked_images[i, ...] = images[i:i+WINDOW_LENGTH]
+
+            for _ in range(self.seq_len):
+                self.state_seq.append(
+                    np.expand_dims(self.conv_model.predict(np.array(stacked_images)), axis=0))
+
+        def step(self, action):
+            # reshape
+            next_state, reward, done = self.tmodel.predict([self.state_seq, action])
+            # unwrap
+            return self.state[0], float(reward[0, 0]), bool(done[0, 0] > .8)
+
+        def reset(self):
+            self.state = self.conv_model.predict(self.real_env.reset())
+            return self.state[0]
+
+    env2 = synthEnv(ml_model,model_truncated,env,sequence_length)
+
+    hidden_in = Input(shape=int(np.prod(conv3.shape[1:])), name='hidden_input')
+    dense_out = Dense(512, activation='relu')(hidden_in)
+    q_out = Dense(nb_actions, activation='linear')(dense_out)
+    model2 = Model(inputs=[hidden_in], outputs=[q_out])
+    print(model2.summary())
+
+    memory2 = SequentialMemory(limit=1000000, window_length=1)
+    policy2 = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
+                                  nb_steps=1000000)
+
+    dqn2 = DQNAgent(model=model2, nb_actions=nb_actions, policy=policy2, memory=memory2,
+                   nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
+                   train_interval=4, delta_clip=1.)
+    dqn2.compile(Adam(lr=.00025), metrics=['mae'])
+    dqn2.fit(env2, callbacks=callbacks, nb_steps=30000, log_interval=10000)
+
+    ########################################################################################################################
+
+
+    ########################################################################################################################
 
 elif args.mode == 'test':
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
