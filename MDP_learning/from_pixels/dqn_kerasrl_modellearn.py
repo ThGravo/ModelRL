@@ -115,7 +115,7 @@ if args.mode == 'train':
     log_filename = 'dqn_{}_log.json'.format(args.env_name)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
     callbacks += [FileLogger(log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=30000, log_interval=10000)
+    dqn.fit(env, callbacks=callbacks, nb_steps=10000, log_interval=10000)
 
     # After training is done, we save the final weights one more time.
     dqn.save_weights(weights_filename, overwrite=True)
@@ -125,63 +125,44 @@ if args.mode == 'train':
 
     model_truncated = Model(inputs=dqn.model.input, outputs=dqn.model.get_layer('flat_feat').output)
     print(model_truncated.summary())
-    '''
-    states_batch = []
-    action_batch = []
-    dqn.memory.actions
-    for el in list(dqn.memory):
-        states_batch.append(el.state0)
-        action_batch.append(el.action)
-    '''
-    data_size = round(dqn.memory.observations.length) - 1
-    experiences = dqn.memory.sample(data_size, range(data_size))
-
-    # Start by extracting the necessary parameters (we use a vectorized implementation).
-    state0_batch = []
-    state1_batch = []
-    # reward_batch = []
-    action_batch = []
-    terminal1_batch = []
-    for e in experiences:
-        state0_batch.append(e.state0)
-        #state1_batch.append(e.state1)
-        # reward_batch.append(e.reward)
-        action_batch.append(e.action)
-        terminal1_batch.append(0. if e.terminal1 else 1.)
-
-    state0_batch = dqn.process_state_batch(state0_batch)
-    state1_batch = dqn.process_state_batch(state1_batch)
-    # reward_batch = np.array(reward_batch)
-    terminal1_batch = np.array(terminal1_batch)
-
-    hidden_states0 = model_truncated.predict_on_batch(state0_batch)
-    # hidden_states0 = np.reshape(hidden_states0, (data_size, 1, -1))
-    # hidden_states1 = model_truncated.predict_on_batch(state1_batch)
-
-    del state0_batch
-    #del state1_batch
-
-    # actions = np.array(action_batch).reshape((data_size, 1))
-
-    # ml_model.fit([hidden_states0, actions], hidden_states1, verbose=1, epochs=16, callbacks=[TensorBoard(log_dir='./logs/Tlearn')])
 
     batch_size = 10000
+    data_size = round(dqn.memory.observations.length) - 1
     for ii in range(100):
         hstates = np.empty((0, sequence_length, int(np.prod(conv3.shape[1:]))))
         actions = np.empty((0, sequence_length, 1))
         next_hstate = np.empty((0, int(np.prod(conv3.shape[1:]))))
-
         for jj in range(batch_size):
             start = random.randrange(data_size - sequence_length)
-            while not terminal1_batch[max(0, start - 1):start + sequence_length].all():
-                start = random.randrange(data_size - sequence_length)
+            # while not terminal1_batch[max(0, start - 1):start + sequence_length].all():
+            #    start = random.randrange(data_size - sequence_length)
 
-            hstates = np.append(hstates,
-                                hidden_states0[np.newaxis, start:start + sequence_length, :], axis=0)
-            actions = np.append(actions, np.expand_dims(
-                np.expand_dims(np.array(action_batch[start:start + sequence_length]), axis=0), axis=2), axis=0)
-            next_hstate = np.append(next_hstate,
-                                     hidden_states0[np.newaxis, start + sequence_length, :], axis=0)
+            experiences = dqn.memory.sample(sequence_length+1, range(start, start+sequence_length+1))
+
+            # Start by extracting the necessary parameters (we use a vectorized implementation).
+            state0_batch = []
+            # state1_batch = []
+            # reward_batch = []
+            action_batch = []
+            terminal1_batch = []
+            for e in experiences:
+                state0_batch.append(e.state0)
+                # state1_batch.append(e.state1)
+                # reward_batch.append(e.reward)
+                action_batch.append(e.action)
+                terminal1_batch.append(0. if e.terminal1 else 1.)
+
+            state0_batch = dqn.process_state_batch(state0_batch)
+            # state1_batch = dqn.process_state_batch(state1_batch)
+            # reward_batch = np.array(reward_batch)
+            action_batch = np.array(action_batch)
+            terminal1_batch = np.array(terminal1_batch)
+
+            hidden_states0 = model_truncated.predict_on_batch(state0_batch)
+
+            hstates = np.append(hstates, hidden_states0[np.newaxis, :-1, :], axis=0)
+            actions = np.append(actions, np.expand_dims(np.expand_dims(action_batch[:-1], axis=0), axis=2), axis=0)
+            next_hstate = np.append(next_hstate, hidden_states0[np.newaxis, -1, :], axis=0)
 
         ml_model.fit([hstates, actions], next_hstate, verbose=1,  # epochs=16,
                      callbacks=[TensorBoard(log_dir='./logs/Tlearn')])
