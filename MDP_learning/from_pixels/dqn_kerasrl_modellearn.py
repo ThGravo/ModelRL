@@ -22,6 +22,11 @@ from keras.callbacks import TensorBoard
 
 INPUT_SHAPE = (84, 84)
 WINDOW_LENGTH = 4
+nb_steps_dqn_fit = 1750000  # 1750000
+nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 1000  # 50000
+target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
+memory_limit = nb_steps_dqn_fit  # 1000000
+nb_steps_annealed_policy = int(nb_steps_dqn_fit / 2)  # 1000000
 
 
 class AtariProcessor(Processor):
@@ -82,12 +87,13 @@ state_pred = Dense(int(np.prod(conv3.shape[1:])), activation='relu', name='predi
 reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
 terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(lstm_out)
 ml_model = Model(inputs=[enc_state, action_in], outputs=[state_pred, reward_pred, terminal_pred])
-ml_model.compile('rmsprop', loss={'predicted_next_state': 'mae', 'predicted_reward': 'mse', 'predicted_terminal': 'binary_crossentropy'}, metrics=['accuracy'])
+ml_model.compile('rmsprop', loss={'predicted_next_state': 'mae', 'predicted_reward': 'mse',
+                                  'predicted_terminal': 'binary_crossentropy'}, metrics=['accuracy'])
 print(ml_model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = SequentialMemory(limit=1000000, window_length=WINDOW_LENGTH)
+memory = SequentialMemory(limit=memory_limit, window_length=WINDOW_LENGTH)
 processor = AtariProcessor()
 
 # Select a policy. We use eps-greedy action selection, which means that a random action is selected
@@ -96,7 +102,7 @@ processor = AtariProcessor()
 # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
 # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
 policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                              nb_steps=1000000)
+                              nb_steps=nb_steps_annealed_policy)
 
 # The trade-off between exploration and exploitation is difficult and an on-going research topic.
 # If you want, you can experiment with the parameters or use a different policy. Another popular one
@@ -105,7 +111,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
-               processor=processor, nb_steps_warmup=10000, gamma=.99, target_model_update=10000,
+               processor=processor, nb_steps_warmup=nb_steps_warmup_dqn_agent, gamma=.99,
+               target_model_update=target_model_update_dqn_agent,
                train_interval=4, delta_clip=1.)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
@@ -117,20 +124,20 @@ if args.mode == 'train':
     log_filename = 'dqn_{}_log.json'.format(args.env_name)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
     callbacks += [FileLogger(log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=30000, log_interval=10000)
+    dqn.fit(env, callbacks=callbacks, nb_steps=nb_steps_dqn_fit, log_interval=10000)
 
     # After training is done, we save the final weights one more time.
     dqn.save_weights(weights_filename, overwrite=True)
 
     # Finally, evaluate our algorithm for 10 episodes.
     # dqn.test(env, nb_episodes=1, visualize=False)
-
+    ########################################################################################################################
     model_truncated = Model(inputs=dqn.model.input, outputs=dqn.model.get_layer('flat_feat').output)
     print(model_truncated.summary())
 
     data_size = dqn.memory.observations.length
-    batch_size = 10000
-    n_epochs = 1 # 9 * round(data_size / batch_size)  # go through data 3 times
+    batch_size = 50000
+    n_epochs = 9 * int(data_size / batch_size) + 1  # go through data n times
     for ii in range(n_epochs):
         hstates = np.empty((batch_size, sequence_length, int(np.prod(conv3.shape[1:]))), dtype=np.float32)
         actions = np.empty((batch_size, sequence_length, 1), dtype=np.float32)
@@ -151,7 +158,7 @@ if args.mode == 'train':
             # state1_batch = []
             reward_seq = []
             action_seq = []
-            terminal1_seq = [] 
+            terminal1_seq = []
 
             for e in experiences:
                 state0_seq.append(e.state0)
@@ -174,67 +181,112 @@ if args.mode == 'train':
             rewards[jj, ...] = reward_seq[np.newaxis, -1]
             terminals[jj, ...] = terminal1_seq[np.newaxis, -1]
 
-        ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], verbose=1,  # epochs=8,
+        ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], verbose=1, epochs=2,
                      callbacks=[TensorBoard(log_dir='./logs/Tlearn')])
 
-    ########################################################################################################################
+    # #######################################################################################################################
     from collections import deque
 
-    class synthEnv():
-        def __init__(self, tmodel, conv_model, real_env, sequence_len):
-            self.seq_len=sequence_length
+
+    class SynthEnv():
+        def __init__(self, tmodel, conv_model, real_env, processor, sequence_len):
             self.tmodel = tmodel
             self.conv_model = conv_model
             self.real_env = real_env
+            self.processor = processor
+            self.seq_len = sequence_len
             self.action_space = real_env.action_space
-            self.observation_space = int(np.prod(conv3.shape[1:]))
-            self.state_seq = deque(maxlen=sequence_len)
+            self.observation_space = gym.spaces.Box(-10, 10, (int(np.prod(conv3.shape[1:])),))
+            self.state_seq, self.action_seq = self.init_state()
 
         def init_state(self):
+            state_seq = deque(maxlen=self.seq_len)
+            act_seq = deque(maxlen=self.seq_len)  # TODO should be just one action
             self.real_env.reset()
+
             images = []
-            for _ in range(self.seq_len+WINDOW_LENGTH):
-                images.append(self.real_env.action_space.sample())
+            for _ in range(self.seq_len + WINDOW_LENGTH):
+                act_seq.append(self.real_env.action_space.sample())
+                obs, rw, dn, info = self.real_env.step(act_seq[-1])
+                obs = processor.process_observation(obs)
+                images.append(obs)
 
-            stacked_images = np.empty((sequence_length, WINDOW_LENGTH), dtype=np.float32)
             for i in range(self.seq_len):
-                stacked_images[i, ...] = images[i:i+WINDOW_LENGTH]
+                state_seq.append(
+                    self.conv_model.predict(
+                        np.expand_dims(np.array(images[i:i + WINDOW_LENGTH]), axis=0)
+                    )
+                )
 
-            for _ in range(self.seq_len):
-                self.state_seq.append(
-                    np.expand_dims(self.conv_model.predict(np.array(stacked_images)), axis=0))
+            return state_seq, act_seq
 
         def step(self, action):
+            # TODO append action before?
+            self.action_seq.append(action)
             # reshape
-            next_state, reward, done = self.tmodel.predict([self.state_seq, action])
-            # unwrap
-            return self.state[0], float(reward[0, 0]), bool(done[0, 0] > .8)
+            ssq = np.rollaxis(np.array(self.state_seq), 1)
+            asq = np.expand_dims(np.expand_dims(np.array(self.action_seq), axis=0), axis=2)
+            next_state, reward, done = self.tmodel.predict([ssq, asq])
+            self.state_seq.append(next_state)
+            # unwrap and add empty info
+            return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .5), {}
 
         def reset(self):
-            self.state = self.conv_model.predict(self.real_env.reset())
-            return self.state[0]
+            self.state_seq, self.action_seq = self.init_state()
+            return self.state_seq[-1].flatten()
 
-    env2 = synthEnv(ml_model,model_truncated,env,sequence_length)
 
-    hidden_in = Input(shape=int(np.prod(conv3.shape[1:])), name='hidden_input')
-    dense_out = Dense(512, activation='relu')(hidden_in)
+    env2 = SynthEnv(ml_model, model_truncated, env, processor, sequence_length)
+
+    hidden_in = Input(shape=(1, int(np.prod(conv3.shape[1:]))), name='hidden_input')
+    hidden_in_f = Flatten(name='flat_hidden')(hidden_in)
+    dense_out = Dense(512, activation='relu')(hidden_in_f)
     q_out = Dense(nb_actions, activation='linear')(dense_out)
     model2 = Model(inputs=[hidden_in], outputs=[q_out])
     print(model2.summary())
 
-    memory2 = SequentialMemory(limit=1000000, window_length=1)
+    memory2 = SequentialMemory(limit=memory_limit, window_length=1)
     policy2 = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                                  nb_steps=1000000)
-
+                                   nb_steps=nb_steps_annealed_policy)
     dqn2 = DQNAgent(model=model2, nb_actions=nb_actions, policy=policy2, memory=memory2,
-                   nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
-                   train_interval=4, delta_clip=1.)
+                    nb_steps_warmup=nb_steps_warmup_dqn_agent, gamma=.99,
+                    target_model_update=target_model_update_dqn_agent,
+                    train_interval=4, delta_clip=1.)
     dqn2.compile(Adam(lr=.00025), metrics=['mae'])
-    dqn2.fit(env2, callbacks=callbacks, nb_steps=30000, log_interval=10000)
+    dqn2.fit(env2, callbacks=callbacks, nb_steps=nb_steps_dqn_fit, log_interval=10000)
 
-    ########################################################################################################################
+    # #######################################################################################################################
 
+    image_in = Input(shape=input_shape, name='main_input')
+    input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
+    conv1 = Convolution2D(32, 8, 8, subsample=(4, 4), activation='relu')(input_perm)
+    conv2 = Convolution2D(64, 4, 4, subsample=(2, 2), activation='relu')(conv1)
+    conv3 = Convolution2D(64, 3, 3, subsample=(1, 1), activation='relu')(conv2)
+    conv_out = Flatten(name='flat_feat')(conv3)
+    dense_out = Dense(512, activation='relu')(conv_out)
+    q_out = Dense(nb_actions, activation='linear')(dense_out)
+    model3 = Model(inputs=[image_in], outputs=[q_out])
 
+    # Combine truncated and model2 top
+    wghts = [np.zeros(w.shape) for w in model3.get_weights()]
+    for layer, w in enumerate(model_truncated.get_weights()):
+        wghts[layer] = w
+    depth_conv = len(model_truncated.get_weights())
+    for layer, w in enumerate(dqn2.model.get_weights()):
+        wghts[layer + depth_conv] = w
+    model3.set_weights(wghts)
+    print(model3.summary())
+
+    memory3 = SequentialMemory(limit=memory_limit, window_length=1)
+    policy3 = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
+                                   nb_steps=nb_steps_annealed_policy)
+    dqn3 = DQNAgent(model=model3, nb_actions=nb_actions, policy=policy3, memory=memory3,
+                    processor=processor, nb_steps_warmup=nb_steps_warmup_dqn_agent, gamma=.99,
+                    target_model_update=target_model_update_dqn_agent,
+                    train_interval=4, delta_clip=1.)
+    dqn3.compile(Adam(lr=.00025), metrics=['mae'])
+    dqn.test(env, nb_episodes=10, visualize=True)
+    dqn3.test(env, nb_episodes=10, visualize=True)
     ########################################################################################################################
 
 elif args.mode == 'test':
