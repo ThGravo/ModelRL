@@ -230,6 +230,8 @@ if args.mode == 'train':
             self.state_seq.append(next_state)
             # unwrap and add empty info
             return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .5), {}
+        # TODO done might never occur in unseen territory
+        # TODO check timing t->t+1
 
         def reset(self):
             self.state_seq, self.action_seq = self.init_state()
