@@ -168,20 +168,20 @@ if args.mode == 'train':
 
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_seq = []
-            # state1_batch = []
+            # state1_seq = []
             reward_seq = []
             action_seq = []
             terminal1_seq = []
 
             for e in experiences:
                 state0_seq.append(e.state0)
-                # state1_batch.append(e.state1)
+                # state1_seq.append(e.state1)
                 reward_seq.append(e.reward)
                 action_seq.append(e.action)
                 terminal1_seq.append(e.terminal1)
 
             state0_seq = dqn.process_state_batch(state0_seq)
-            # state1_batch = dqn.process_state_batch(state1_batch)
+            # state1_seq = dqn.process_state_batch(state1_seq)
             reward_seq = np.array(reward_seq)
             action_seq = np.array(action_seq, dtype=np.float32)
             terminal1_seq = np.array(terminal1_seq)
