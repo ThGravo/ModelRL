@@ -28,7 +28,6 @@ threads = []
 
 def evaluate_single(args):
     index, params = args
-    print('Evaluating params: {}'.format(params))
     params = {**params, **fixed_params}
     weightedMSE = 0
     weights = [1 / 0.0268, 1 / .000004186, 1 / 0.017888, 1 / 0.0007178]
@@ -36,6 +35,7 @@ def evaluate_single(args):
     weights = [1]
     env_names = ['Pong-ram-v4']
     env_names = ['Ant-v1']
+    mse_dict = {}
     for env_name, weight in zip(env_names, weights):
         MSEs = []
         for i in range(N_RUNS):
@@ -43,11 +43,11 @@ def evaluate_single(args):
             tlearner = transition_learning.ModelLearner(env.observation_space, env.action_space, **params)
             tlearner.run(env)
             MSEs.append(tlearner.evaluate(env))
-
         mse = np.mean(MSEs)
-        print('Finished evaluating env {} with MSE of {}.'.format(env_name, mse))
         weightedMSE += weight * mse
+        mse_dict[env_name] = mse
 
+    print('Finished evaluating {} with MSEs of {}.'.format(params, mse_dict))
     return weightedMSE
 
 
