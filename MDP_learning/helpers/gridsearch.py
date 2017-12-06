@@ -18,7 +18,7 @@ grid_params = {
                            ('relu', 'tanh', 'sigmoid'), ('tanh', 'sigmoid', 'relu'), ('sigmoid', 'tanh', 'relu'),
                            ('relu', 'tanh', 'sigmoid', 'relu'), ('tanh', 'sigmoid', 'tanh', 'relu')]}'''
 fixed_params = {
-    'action_size': 1
+    # 'action_size': 1
 }
 
 grid = list(ParameterGrid(grid_params))
