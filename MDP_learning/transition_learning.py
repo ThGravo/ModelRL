@@ -193,13 +193,19 @@ class ModelLearner:
 
 
 if __name__ == "__main__":
-    for env_name in ["Pong-ram-v4"]:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:
+    for env_name in ['Ant-v1']:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
         env = gym.make(env_name)
         # get size of state and action from environment
         state_size = sum(env.observation_space.shape)
-        num_discrete_actions = env.action_space.n
 
-        canary = ModelLearner(state_size, num_discrete_actions, tmodel_dim_multipliers=(12, 4))
+        if isinstance(env.action_space, gym.spaces.Discrete):
+            num_discrete_actions = env.action_space.n
+            action_size = 1
+        else:
+            num_discrete_actions = 0
+            action_size = sum(env.action_space.shape)
+
+        canary = ModelLearner(state_size, num_discrete_actions, action_size=action_size, tmodel_dim_multipliers=(12, 4))
         canary.batch_size = 100000
         canary.run(env, rounds=8)
         print('MSE: {}'.format(canary.evaluate(env)))
