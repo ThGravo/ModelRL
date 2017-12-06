@@ -63,15 +63,15 @@ nb_actions = env.action_space.n
 
 class ModelBasedLearner:
 
-    def __init__(self, env, input_shape, action_shape=(1, ), sequence_length=10):
+    def __init__(self, env, input_shape=(WINDOW_LENGTH,) + INPUT_SHAPE, action_shape=(1, ), sequence_length=10):
         self.env = env
         self.sequence_length = sequence_length
         self.input_shape = input_shape
         self.action_shape = action_shape
         self.nb_actions = self.env.action_space.n
+        self.input_shape = input_shape
 
     def main_net(self):
-        self.input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
         image_in = Input(shape=self.input_shape, name='main_input')
         action_in = Input(shape=self.action_shape, name='action_input')
         input_perm = Permute((2, 3, 1), input_shape=self.input_shape)(image_in)
@@ -83,12 +83,12 @@ class ModelBasedLearner:
         dense = Dense(512, activation='relu')(state_and_action)
 
         # feed-forward model learning branch
-        state_pred = Dense(int(np.prod(conv_out.shape[1])), activation='relu', name='predicted_next_state')(dense)
+        state_pred = Dense(int(np.prod(conv3.shape[1:])), activation='relu', name='predicted_next_state')(dense)
         reward_pred = Dense(1, activation='linear', name='predicted_reward')(dense)
         terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(dense)
 
         # Q-learning branch
-        q_out = Dense(self.nb_actions, activation='linear')(dense)
+        q_out = Dense(self.nb_actions, activation='linear', name='q_out')(dense)
 
         main_model = Model(inputs=[image_in, action_in], outputs=[state_pred,reward_pred,terminal_pred,q_out])
         return main_model
@@ -101,9 +101,27 @@ processor = AtariProcessor()
 policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
                               nb_steps=nb_steps_annealed_policy)
 
-main_net =
+learner = ModelBasedLearner(env)
+main_net = learner.main_net()
 
-dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
+ml_learner = Model(inputs=main_net.input,
+                 outputs=[
+                    main_net.get_layer('predicted_next_state').output,
+                    main_net.get_layer('predicted_reward').output,
+                    main_net.get_layer('predicted_terminal').output
+                 ])
+ml_learner.compile('rmsprop', loss={'predicted_next_state': 'mae',
+                                    'predicted_reward': 'mse',
+                                    'predicted_terminal': 'binary_crossentropy'},
+                              metrics=['accuracy'])
+print(ml_learner.summary())
+q_learner = Model(inputs=main_net.input, outputs=main_net.get_layer('q_out').output)
+print(q_learner.summary())
+
+
+
+dqn = DQNAgent(model=q_learner, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, nb_steps_warmup=nb_steps_warmup_dqn_agent, gamma=.99,
                target_model_update=target_model_update_dqn_agent,
                train_interval=4, delta_clip=1.)
+x = []
