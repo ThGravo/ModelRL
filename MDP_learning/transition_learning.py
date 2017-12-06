@@ -14,13 +14,19 @@ import matplotlib.pyplot as plt
 
 
 class ModelLearner:
-    def __init__(self, state_size, num_discrete_actions, action_size=1, learning_rate=.001,
+    def __init__(self, observation_space, action_space, learning_rate=.001,
                  tmodel_dim_multipliers=(6, 4), tmodel_activations=('relu', 'relu')):
 
-        # get size of state and action
-        self.state_size = state_size
-        self.action_size = action_size
-        self.action_num = num_discrete_actions
+        # get size of state and action from environment
+        self.state_size = sum(observation_space.shape)
+        self.action_size = 1
+        self.action_num = 0
+        if isinstance(action_space, gym.spaces.Discrete):
+            self.action_num = action_space.n
+        elif isinstance(action_space, gym.spaces.Box):
+            self.action_size = sum(action_space.shape)
+        else:
+            raise ValueError("The action_space is of type: {} - which is not supported!".format(type(action_space)))
 
         # These are hyper parameters
         self.learning_rate = learning_rate
@@ -31,13 +37,13 @@ class ModelLearner:
         self.memory = deque(maxlen=self.mem_size)
 
         # create main model and target model
-        self.tmodel = self.build_regression_model(state_size + action_size, state_size, lr=learning_rate,
+        self.tmodel = self.build_regression_model(self.state_size + self.action_size, self.state_size, lr=learning_rate,
                                                   dim_multipliers=tmodel_dim_multipliers,
                                                   activations=tmodel_activations)
-        self.rmodel = self.build_regression_model(state_size, 1, lr=learning_rate,
+        self.rmodel = self.build_regression_model(self.state_size, 1, lr=learning_rate,
                                                   dim_multipliers=(4, 4),
                                                   activations=('sigmoid', 'sigmoid'))
-        self.dmodel = self.build_dmodel(state_size)
+        self.dmodel = self.build_dmodel(self.state_size)
 
         self.Ttensorboard = [] # [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
         self.Rtensorboard = [] # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
@@ -78,8 +84,8 @@ class ModelLearner:
         return model
 
     # get action from model using random policy
-    def get_action(self, state, env):
-        return env.action_space.sample()  # random.randrange(self.action_num)
+    def get_action(self, state, environment):
+        return environment.action_space.sample()
 
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
@@ -123,7 +129,7 @@ class ModelLearner:
 
         return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .8)
         # TODO how sure do we want to be about being done? 80%? 90?
-        # TODO yah to force the type to be the same as in gym environment
+        # TODO yah to force the type to be the same as in gym environment (flatten?)
 
     def fill_mem(self, environment):
         state = environment.reset()
@@ -176,14 +182,14 @@ class ModelLearner:
         p = np.asarray(nexts_pred)
         r = np.asarray(nexts_real)
         if do_plots:
-            for i in range(min(state_size, 12)):
+            for i in range(min(self.state_size, 12)):
                 plt.figure(i)
                 plt.plot(p[:, i])
                 plt.plot(r[:, i])
-            plt.figure(state_size + 1)
+            plt.figure(self.state_size + 1)
             plt.plot(rewards_pred)
             plt.plot(rewards_real)
-            plt.figure(state_size + 2)
+            plt.figure(self.state_size + 2)
             plt.plot(dones_pred)
             plt.plot(dones_real)
             plt.show()
@@ -195,17 +201,9 @@ class ModelLearner:
 if __name__ == "__main__":
     for env_name in ['Ant-v1']:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
         env = gym.make(env_name)
-        # get size of state and action from environment
-        state_size = sum(env.observation_space.shape)
 
-        if isinstance(env.action_space, gym.spaces.Discrete):
-            num_discrete_actions = env.action_space.n
-            action_size = 1
-        else:
-            num_discrete_actions = 0
-            action_size = sum(env.action_space.shape)
-
-        canary = ModelLearner(state_size, num_discrete_actions, action_size=action_size, tmodel_dim_multipliers=(12, 4))
+        canary = ModelLearner(env.observation_space, env.action_space, tmodel_dim_multipliers=(12, 4))
         canary.batch_size = 100000
         canary.run(env, rounds=8)
+
         print('MSE: {}'.format(canary.evaluate(env)))
