@@ -8,9 +8,9 @@ import transition_learning
 N_RUNS = 10
 
 grid_params = {
-    'learning_rate': [0.001, 0.005, 0.01, 0.1],
+    'learning_rate': [0.001, 0.005, 0.01],
     'tmodel_dim_multipliers': [(1, 1), (3, 3), (6, 3), (12, 3), (6, 6), (1, 1, 1), (3, 3, 3), (1, 1, 1, 1),
-                               (3, 3, 3, 3)],
+                               (3, 3, 3, 3), (13, 13, 9, 9)],
     'tmodel_activations': [('relu', 'relu'), ('sigmoid', 'sigmoid'), ('tanh', 'tanh')]}
 ''',
                            ('relu', 'sigmoid', 'tanh'), ('tanh', 'relu', 'sigmoid',),
@@ -22,7 +22,7 @@ fixed_params = {
 }
 
 grid = list(ParameterGrid(grid_params))
-final_scores = np.zeros(len(grid))
+# final_scores = np.zeros(len(grid))
 threads = []
 
 
@@ -33,14 +33,14 @@ def evaluate_single(args):
     weightedMSE = 0
     weights = [1 / 0.0268, 1 / .000004186, 1 / 0.017888, 1 / 0.0007178]
     env_names = ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']
+    weights = [1]
     env_names = ['Pong-ram-v4']
+    env_names = ['Ant-v1']
     for env_name, weight in zip(env_names, weights):
         MSEs = []
         for i in range(N_RUNS):
             env = gym.make(env_name)
-            tlearner = transition_learning.ModelLearner(sum(env.observation_space.shape),
-                                                        env.action_space.n,
-                                                        **params)
+            tlearner = transition_learning.ModelLearner(env.observation_space, env.action_space, **params)
             tlearner.run(env)
             MSEs.append(tlearner.evaluate(env))
 
@@ -54,8 +54,13 @@ def evaluate_single(args):
 def run():
     start_time = time.time()
     print('About to evaluate {} parameter sets.'.format(len(grid)))
-    pool = multiprocessing.Pool(processes=8)  # multiprocessing.cpu_count())
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
     final_scores = pool.map(evaluate_single, list(enumerate(grid)))
+
+    sort_idx = np.argsort(final_scores)
+
+    for i in sort_idx:
+        print('Parameter set {} achieved score of {}'.format(grid[i], final_scores[i]))
 
     print('Best parameter set was {} with score of {}'.format(grid[np.argmin(final_scores)], np.min(final_scores)))
     print('Worst parameter set was {} with score of {}'.format(grid[np.argmax(final_scores)], np.max(final_scores)))
