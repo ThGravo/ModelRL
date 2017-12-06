@@ -8,14 +8,13 @@ import gym
 import random
 import numpy as np
 import matplotlib
-
-#matplotlib.use('GTK3Cairo', warn=False, force=True)
+# matplotlib.use('GTK3Cairo', warn=False, force=True)
 import matplotlib.pyplot as plt
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, learning_rate=.001,
-                 tmodel_dim_multipliers=(6, 4), tmodel_activations=('relu', 'relu')):
+    def __init__(self, observation_space, action_space, data_size=10000, epochs=4, learning_rate=.001,
+                 tmodel_dim_multipliers=(3, 3), tmodel_activations=('sigmoid', 'sigmoid')):
 
         # get size of state and action from environment
         self.state_size = sum(observation_space.shape)
@@ -30,11 +29,10 @@ class ModelLearner:
 
         # These are hyper parameters
         self.learning_rate = learning_rate
-        self.batch_size = 1000
-        self.net_train_epochs = 64
+        self.net_train_epochs = epochs
         # create replay memory using deque
-        self.mem_size = self.batch_size
-        self.memory = deque(maxlen=self.mem_size)
+        self.data_size = data_size
+        self.memory = deque(maxlen=self.data_size)
 
         # create main model and target model
         self.tmodel = self.build_regression_model(self.state_size + self.action_size, self.state_size, lr=learning_rate,
@@ -45,9 +43,9 @@ class ModelLearner:
                                                   activations=('sigmoid', 'sigmoid'))
         self.dmodel = self.build_dmodel(self.state_size)
 
-        self.Ttensorboard = [] # [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
-        self.Rtensorboard = [] # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
-        self.Dtensorboard = [] # [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
+        self.Ttensorboard = []  # [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
+        self.Rtensorboard = []  # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
+        self.Dtensorboard = []  # [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
 
     # approximate Transition function
     # state and action is input and successor state is output
@@ -100,7 +98,7 @@ class ModelLearner:
                         batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
-                        callbacks=self.Ttensorboard, verbose=0)
+                        callbacks=self.Ttensorboard, verbose=1)
 
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
@@ -131,10 +129,10 @@ class ModelLearner:
         # TODO how sure do we want to be about being done? 80%? 90?
         # TODO yah to force the type to be the same as in gym environment (flatten?)
 
-    def fill_mem(self, environment):
+    def refill_mem(self, environment):
         state = environment.reset()
-
-        for i in range(self.mem_size):
+        self.memory.clear()
+        for i in range(self.data_size):
             # get action for the current state and go one step in environment
             action = self.get_action(state, environment)
             next_state, reward, done, info = environment.step(action)
@@ -149,11 +147,8 @@ class ModelLearner:
 
     def run(self, environment, rounds=1):
         for e in range(rounds):
-            # print('Filling Replay Memory...')
-            self.fill_mem(environment)
-            # print('Training...')
+            self.refill_mem(environment)
             self.train_models()
-            self.memory.clear()
 
     def evaluate(self, environment, do_plots=False):
         states, nexts_real, nexts_pred, rewards_real, rewards_pred, dones_real, dones_pred = [], [], [], [], [], [], []
@@ -202,8 +197,7 @@ if __name__ == "__main__":
     for env_name in ['Ant-v1']:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
         env = gym.make(env_name)
 
-        canary = ModelLearner(env.observation_space, env.action_space, tmodel_dim_multipliers=(12, 4))
-        canary.batch_size = 100000
+        canary = ModelLearner(env.observation_space, env.action_space, data_size=100000, tmodel_dim_multipliers=(12, 4))
         canary.run(env, rounds=8)
 
         print('MSE: {}'.format(canary.evaluate(env)))
