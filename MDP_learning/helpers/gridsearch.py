@@ -8,17 +8,18 @@ import transition_learning
 N_RUNS = 10
 
 grid_params = {
-    'learning_rate': [0.001, 0.005, 0.01],
+    'learning_rate': [0.0001, 0.0005, 0.001],
     'tmodel_dim_multipliers': [(1, 1), (3, 3), (6, 3), (12, 3), (6, 6), (1, 1, 1), (3, 3, 3), (1, 1, 1, 1),
                                (3, 3, 3, 3), (13, 13, 9, 9)],
-    'tmodel_activations': [('relu', 'relu'), ('sigmoid', 'sigmoid'), ('tanh', 'tanh')]}
-''',
+    'tmodel_activations': [('sigmoid', 'sigmoid'), ('tanh', 'sigmoid'), ('relu', 'sigmoid')]}
+''',('relu', 'relu'), 
                            ('relu', 'sigmoid', 'tanh'), ('tanh', 'relu', 'sigmoid',),
                            ('relu', 'tanh', 'relu'), ('sigmoid', 'relu', 'sigmoid'), ('tanh', 'sigmoid', 'tanh'),
                            ('relu', 'tanh', 'sigmoid'), ('tanh', 'sigmoid', 'relu'), ('sigmoid', 'tanh', 'relu'),
                            ('relu', 'tanh', 'sigmoid', 'relu'), ('tanh', 'sigmoid', 'tanh', 'relu')]}'''
 fixed_params = {
-    # 'action_size': 1
+    'data_size': 100000,
+    'epochs': 8
 }
 
 grid = list(ParameterGrid(grid_params))
