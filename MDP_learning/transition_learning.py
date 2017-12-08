@@ -11,10 +11,16 @@ import matplotlib
 # matplotlib.use('GTK3Cairo', warn=False, force=True)
 import matplotlib.pyplot as plt
 
+'''
+GRID SEARCH RESULT
+Best parameter set was 
+{'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)}
+'''
+
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=100000, epochs=4, learning_rate=.001,
-                 tmodel_dim_multipliers=(3, 3), tmodel_activations=('sigmoid', 'sigmoid')):
+    def __init__(self, observation_space, action_space, data_size=250000, epochs=50, learning_rate=.001,
+                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid')):
 
         # get size of state and action from environment
         self.state_size = sum(observation_space.shape)
@@ -98,7 +104,7 @@ class ModelLearner:
                         batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
-                        callbacks=self.Ttensorboard, verbose=0)
+                        callbacks=self.Ttensorboard, verbose=1)
 
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
@@ -197,9 +203,7 @@ if __name__ == "__main__":
     for env_name in ['Ant-v1']:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
         env = gym.make(env_name)
 
-        canary = ModelLearner(env.observation_space, env.action_space, data_size=100000,
-                              tmodel_dim_multipliers=(6, 6), learning_rate=0.001,
-                              tmodel_activations=('relu', 'sigmoid'))
+        canary = ModelLearner(env.observation_space, env.action_space)
         canary.run(env, rounds=8)
 
         print('MSE: {}'.format(canary.evaluate(env)))
