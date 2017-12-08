@@ -1,6 +1,6 @@
 import tensorflow as tf
 from collections import deque
-from keras.layers import Dense
+from keras.layers import Dense, LSTM
 from keras.optimizers import Adam
 from keras.models import Sequential
 from keras.callbacks import TensorBoard
@@ -19,8 +19,8 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=250000, epochs=50, learning_rate=.001,
-                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid')):
+    def __init__(self, observation_space, action_space, data_size=10000, epochs=4, learning_rate=.001,
+                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), recurrent=False):
 
         # get size of state and action from environment
         self.state_size = sum(observation_space.shape)
@@ -33,14 +33,13 @@ class ModelLearner:
         else:
             raise ValueError("The action_space is of type: {} - which is not supported!".format(type(action_space)))
 
-        # These are hyper parameters
         self.learning_rate = learning_rate
         self.net_train_epochs = epochs
-        # create replay memory using deque
         self.data_size = data_size
         self.memory = deque(maxlen=self.data_size)
+        self.recurrent = recurrent
 
-        # create main model and target model
+
         self.tmodel = self.build_regression_model(self.state_size + self.action_size, self.state_size, lr=learning_rate,
                                                   dim_multipliers=tmodel_dim_multipliers,
                                                   activations=tmodel_activations)
@@ -62,14 +61,20 @@ class ModelLearner:
                                activations=('relu', 'relu'),
                                lr=.001):
         model = Sequential()
-        model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
-        for i in range(len(dim_multipliers) - 1):
-            model.add(Dense(self.state_size * dim_multipliers[i + 1],
-                            activation=activations[min(i + 1, len(activations) - 1)]))
-        model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        # model.summary()
+        if self.recurrent:
+            model.add(LSTM(64,input_dim=1))
+            model.add(Dense(output_dim, activation='linear'))
+            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        else:
+            model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
+            for i in range(len(dim_multipliers) - 1):
+                model.add(Dense(self.state_size * dim_multipliers[i + 1],
+                                activation=activations[min(i + 1, len(activations) - 1)]))
+            model.add(Dense(output_dim, activation='linear'))
+            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.summary()
         return model
+
 
     # approximate Done value
     # state is input and reward is output
