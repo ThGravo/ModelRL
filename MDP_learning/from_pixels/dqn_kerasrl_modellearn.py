@@ -71,20 +71,29 @@ dense_out = Dense(512, activation='relu')(conv_out)
 q_out = Dense(nb_actions, activation='linear')(dense_out)
 model = Model(inputs=[image_in], outputs=[q_out])
 print(model.summary())
+hstate_size = int(np.prod(conv3.shape[1:]))
 
 # Model learner network
-sequence_length = 10
+USE_LSTM = False
+sequence_length = 20 if USE_LSTM else 1
 action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
 action_in = Input(shape=action_shape, name='action_input')
-enc_state = Input(shape=(sequence_length, int(np.prod(conv3.shape[1:]))), name='enc_state')
-action_in_reshape = Reshape((sequence_length, 1))(action_in)
-enc_state_and_action = concatenate([enc_state, action_in_reshape], name='encoded_state_and_action')
-lstm_out = LSTM(4096)(enc_state_and_action)
-state_pred = Dense(int(np.prod(conv3.shape[1:])), activation='linear', name='predicted_next_state')(lstm_out)
+enc_state = Input(shape=(sequence_length, hstate_size), name='enc_state')
+if USE_LSTM:
+    action_in_reshape = Reshape((sequence_length, 1))(action_in)
+    enc_state_and_action = concatenate([enc_state, action_in_reshape], name='encoded_state_and_action')
+    lstm_out = LSTM(4096, activation='relu')(enc_state_and_action)
+else:
+    action_in_flat = Flatten(name='flat_act')(action_in)
+    enc_state_flat = Flatten(name='flat_state')(enc_state)
+    enc_state_and_action = concatenate([enc_state_flat, action_in_flat], name='encoded_state_and_action')
+    lstm_out = Dense(8192, activation='linear')(enc_state_and_action)
+
+state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
 reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
 terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(lstm_out)
 ml_model = Model(inputs=[enc_state, action_in], outputs=[state_pred, reward_pred, terminal_pred])
-ml_model.compile('adam', loss={'predicted_next_state': 'mae', 'predicted_reward': 'mse',
+ml_model.compile('adam', loss={'predicted_next_state': 'mse', 'predicted_reward': 'mse',
                                'predicted_terminal': 'binary_crossentropy'}, metrics=['accuracy'])
 print(ml_model.summary())
 
@@ -150,7 +159,7 @@ if args.mode == 'train':
                 if start is 0:
                     start = random.randrange(data_size - sequence_length)
                 else:
-                    start -= 1 # get a bit more terminal
+                    start -= 1  # get a bit more terminal
                 experiences = dqn.memory.sample(sequence_length, range(start, start + sequence_length))
 
             # Start by extracting the necessary parameters (we use a vectorized implementation).
@@ -184,7 +193,7 @@ if args.mode == 'train':
             terminals[jj, ...] = terminal1_seq[np.newaxis, -1]
 
         ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], verbose=1, epochs=4,
-                     callbacks=[TensorBoard(log_dir='./logs/Tlearn')], shuffle=False)
+                     callbacks=[TensorBoard(log_dir='./logs/TlearnBIG')])  # , shuffle=False)
 
     # #######################################################################################################################
     from collections import deque
@@ -282,7 +291,7 @@ if args.mode == 'train':
     model3.set_weights(wghts)
     print(model3.summary())
 
-    memory3 = SequentialMemory(limit=memory_limit, window_length=1)
+    memory3 = SequentialMemory(limit=memory_limit, window_length=WINDOW_LENGTH)
     policy3 = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
                                    nb_steps=nb_steps_annealed_policy)
     dqn3 = DQNAgent(model=model3, nb_actions=nb_actions, policy=policy3, memory=memory3,
@@ -290,9 +299,9 @@ if args.mode == 'train':
                     target_model_update=target_model_update_dqn_agent,
                     train_interval=4, delta_clip=1.)
     dqn3.compile(Adam(lr=.00025), metrics=['mae'])
-    dqn.test(env, nb_episodes=10, visualize=True)
-    dqn3.test(env, nb_episodes=10, visualize=True)
-    ########################################################################################################################
+    dqn.test(env, nb_episodes=10, visualize=False)
+    dqn3.test(env, nb_episodes=10, visualize=False)
+    # #######################################################################################################################
 
 elif args.mode == 'test':
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
