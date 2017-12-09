@@ -1,0 +1,93 @@
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.0635603486255829
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.0666069888056455
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.06664066006153316
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.06701756758494455
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.06886670645310906
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.07094931146180818
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.07100586245267337
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.07125996882074123
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.07284826604850583
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.07365317931442425
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.07385526180700616
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.07406325202322211
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.07412365998731603
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.07528661005431
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.076274602055411
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.07856949492768009
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.07997923923256249
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.08017958847297882
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.08209337748219252
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.08256150226470137
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.08559458842529186
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.08710772213502198
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.09093616748966384
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.09629942909636283
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.0973071664103106
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.09795591462159876
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.09914346425464823
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.09919635572349011
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.10416926261003445
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.10790463279395476
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.11297104568421665
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.11999445237146186
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.12197034874838186
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.12615149736623205
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.1280058974616117
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.12801398454819143
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.1284593653630783
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.13134579915260636
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.13274295221179921
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.13336527053430067
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.1344218410142716
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.13570972358593475
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.13946300091360003
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.14006432417781065
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.1424838765799618
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.14320651476945073
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.14817685522949559
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.15044890785042142
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.15777904027860035
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.16067842991342696
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.1698512214031607
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.17038410914846497
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.17336161233684633
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.17414370610663674
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.17562570435454083
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.17947441387387
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.17968159008887175
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.1803563598337577
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.19535388462752418
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.19743277447393673
+Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.19820248776751015
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.2027224560626697
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.21140655250148982
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.21632526788262602
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.21802747364203112
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.21935368919612586
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.23245444518778013
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.23703152485668397
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.23773207018894255
+Parameter set {'learning_rate': 0.0005, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.24331123982987313
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.2554885159530727
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.26328226526923515
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.2678483207326615
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.3370055072577838
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.3479936844113828
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.37399306076483313
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.3778991730215378
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.38038947750960317
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (6, 3)} achieved score of 0.38559916836529684
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (13, 13, 9, 9)} achieved score of 0.38731422014356764
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.3877534404662329
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3)} achieved score of 0.39296933584530647
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3)} achieved score of 0.4053973143166559
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (3, 3, 3, 3)} achieved score of 0.4268583094529822
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.43924574779184605
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1)} achieved score of 0.4443741506930491
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.4518692026989082
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1)} achieved score of 0.46184637941684115
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.46244376455183955
+Parameter set {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} achieved score of 0.5705950363020182
+Best parameter set was {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} with score of 0.0635603486255829
+Worst parameter set was {'learning_rate': 0.0001, 'tmodel_activations': ('sigmoid', 'sigmoid'), 'tmodel_dim_multipliers': (1, 1, 1, 1)} with score of 0.5705950363020182
+Execution time: 67585.06523633003 sec

@@ -8,9 +8,11 @@ import transition_learning_RNN as transition_learning
 N_RUNS = 10
 
 grid_params = {
-    'learning_rate': [0.0005, 0.001],
-    'tmodel_dim_multipliers': [(6,), (12, 12), (6, 6), (6, 6, 6)],
-    'tmodel_activations': [('sigmoid',), ('tanh', 'sigmoid'), ('relu', 'sigmoid'), ('relu', 'tanh', 'sigmoid',)]}
+    'sequence_length': [1, 2, 8, 32],
+    # 'learning_rate': [0.0005, 0.001],
+    'tmodel_dim_multipliers': [(6,), (12, 12), (6, 6), (6, 6, 6)]
+    # 'tmodel_activations': [('sigmoid',), ('tanh', 'sigmoid'), ('relu', 'sigmoid'), ('relu', 'tanh', 'sigmoid',)]
+}
 ''',('relu', 'relu'), 
                            ('relu', 'sigmoid', 'tanh'), ('tanh', 'relu', 'sigmoid',),
                            ('relu', 'tanh', 'relu'), ('sigmoid', 'relu', 'sigmoid'), ('tanh', 'sigmoid', 'tanh'),
@@ -18,7 +20,9 @@ grid_params = {
                            ('relu', 'tanh', 'sigmoid', 'relu'), ('tanh', 'sigmoid', 'tanh', 'relu')]}'''
 fixed_params = {
     'data_size': 100000,
-    'epochs': 8
+    'epochs': 8,
+    'tmodel_activations': ('relu', 'sigmoid'),
+    'learning_rate': .001
 }
 
 grid = list(ParameterGrid(grid_params))
