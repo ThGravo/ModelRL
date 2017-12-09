@@ -20,7 +20,7 @@ Best parameter set was
 
 class ModelLearner:
     def __init__(self, observation_space, action_space, data_size=50000, epochs=50, learning_rate=.001,
-                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid')):
+                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), sequence_length=1):
 
         # get size of state and action from environment
         self.state_size = sum(observation_space.shape)
@@ -36,8 +36,8 @@ class ModelLearner:
         # These are hyper parameters
         self.learning_rate = learning_rate
         self.net_train_epochs = epochs
-        self.useRNN = True
-        self.sequence_length = 10
+        self.useRNN = sequence_length > 1
+        self.sequence_length = sequence_length
 
         # create replay memory using deque
         self.data_size = data_size
@@ -101,7 +101,7 @@ class ModelLearner:
             # stacked LSTMs need to return a sequence
         model.add(Dense(output_dim, activation='linear'))
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        model.summary()
+        # model.summary()
         return model
 
     def setup_batch_for_RNN(self, batch):
