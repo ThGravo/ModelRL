@@ -3,15 +3,14 @@ import multiprocessing
 import numpy as np
 from sklearn.model_selection import ParameterGrid
 import gym
-import transition_learning
+import transition_learning_RNN as transition_learning
 
 N_RUNS = 10
 
 grid_params = {
-    'learning_rate': [0.0001, 0.0005, 0.001],
-    'tmodel_dim_multipliers': [(1, 1), (3, 3), (6, 3), (12, 3), (6, 6), (1, 1, 1), (3, 3, 3), (1, 1, 1, 1),
-                               (3, 3, 3, 3), (13, 13, 9, 9)],
-    'tmodel_activations': [('sigmoid', 'sigmoid'), ('tanh', 'sigmoid'), ('relu', 'sigmoid')]}
+    'learning_rate': [0.0005, 0.001],
+    'tmodel_dim_multipliers': [(6,), (12, 12), (6, 6), (6, 6, 6)],
+    'tmodel_activations': [('sigmoid',), ('tanh', 'sigmoid'), ('relu', 'sigmoid'), ('relu', 'tanh', 'sigmoid',)]}
 ''',('relu', 'relu'), 
                            ('relu', 'sigmoid', 'tanh'), ('tanh', 'relu', 'sigmoid',),
                            ('relu', 'tanh', 'relu'), ('sigmoid', 'relu', 'sigmoid'), ('tanh', 'sigmoid', 'tanh'),
