@@ -74,8 +74,8 @@ print(model.summary())
 hstate_size = int(np.prod(conv3.shape[1:]))
 
 # Model learner network
-USE_LSTM = False
-sequence_length = 20 if USE_LSTM else 1
+USE_LSTM = True
+sequence_length = 5 if USE_LSTM else 1
 action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
 action_in = Input(shape=action_shape, name='action_input')
 enc_state = Input(shape=(sequence_length, hstate_size), name='enc_state')
@@ -87,7 +87,7 @@ else:
     action_in_flat = Flatten(name='flat_act')(action_in)
     enc_state_flat = Flatten(name='flat_state')(enc_state)
     enc_state_and_action = concatenate([enc_state_flat, action_in_flat], name='encoded_state_and_action')
-    lstm_out = Dense(8192, activation='linear')(enc_state_and_action)
+    lstm_out = Dense(8192, activation='relu')(enc_state_and_action)
 
 state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
 reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
