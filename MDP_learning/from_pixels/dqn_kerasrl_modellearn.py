@@ -88,6 +88,7 @@ else:
     enc_state_flat = Flatten(name='flat_state')(enc_state)
     enc_state_and_action = concatenate([enc_state_flat, action_in_flat], name='encoded_state_and_action')
     dense_out = Dense(8192, activation='relu')(enc_state_and_action)
+    dense_out = Dense(4096, activation='relu')(dense_out)
     lstm_out = Dense(4096, activation='relu')(dense_out)
 
 state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
