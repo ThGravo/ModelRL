@@ -5,12 +5,12 @@ from sklearn.model_selection import ParameterGrid
 import gym
 import transition_learning_RNN as transition_learning
 
-N_RUNS = 10
+N_RUNS = 1
 
 grid_params = {
-    'sequence_length': [1, 2, 8, 32],
+    'sequence_length': [1, 2, 8, 16],
     # 'learning_rate': [0.0005, 0.001],
-    'tmodel_dim_multipliers': [(6,), (12, 12), (6, 6), (6, 6, 6)]
+    'tmodel_dim_multipliers': [(6,), (6, 6), (12, 12), (6, 6, 6)]
     # 'tmodel_activations': [('sigmoid',), ('tanh', 'sigmoid'), ('relu', 'sigmoid'), ('relu', 'tanh', 'sigmoid',)]
 }
 ''',('relu', 'relu'), 
@@ -19,7 +19,7 @@ grid_params = {
                            ('relu', 'tanh', 'sigmoid'), ('tanh', 'sigmoid', 'relu'), ('sigmoid', 'tanh', 'relu'),
                            ('relu', 'tanh', 'sigmoid', 'relu'), ('tanh', 'sigmoid', 'tanh', 'relu')]}'''
 fixed_params = {
-    'data_size': 100000,
+    'data_size': 200000,
     'epochs': 8,
     'tmodel_activations': ('relu', 'sigmoid'),
     'learning_rate': .001
@@ -58,7 +58,7 @@ def evaluate_single(args):
 def run():
     start_time = time.time()
     print('About to evaluate {} parameter sets.'.format(len(grid)))
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    pool = multiprocessing.Pool(processes=4)  # multiprocessing.cpu_count())
     final_scores = pool.map(evaluate_single, list(enumerate(grid)))
 
     sort_idx = np.argsort(final_scores)
