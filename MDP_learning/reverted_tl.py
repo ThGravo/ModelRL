@@ -18,6 +18,14 @@ Best parameter set was
 {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)}
 '''
 
+'''
+def block_obs(self, state, prob):
+    for x in range(self.state_size):
+        rand = random.random()
+        if rand > prob:
+            state[x] = None
+    return state
+'''
 
 class ModelLearner:
     def __init__(self, observation_space, action_space, data_size=10000, epochs=4, trace_length=3, learning_rate=.001,

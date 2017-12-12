@@ -12,6 +12,7 @@ import matplotlib
 # matplotlib.use('GTK3Cairo', warn=False, force=True)
 import matplotlib.pyplot as plt
 
+
 '''
 GRID SEARCH RESULT
 Best parameter set was 
@@ -20,9 +21,15 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=50000, epochs=5, learning_rate=.001,
-                 tmodel_dim_multipliers=(12, 12), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
-                 partial_obs_rate=0.0):
+    def __init__(self, observation_space,
+                 action_space,
+                 data_size=50000, epochs=50,
+                 learning_rate=.001,
+                 tmodel_dim_multipliers=(6, 6),
+                 tmodel_activations=('relu', 'sigmoid'),
+                 sequence_length=1,
+                 partial_obs_rate=0,
+                 data_prepro=False):
 
         # get size of state and action from environment
         self.state_size = sum(observation_space.shape)
@@ -40,11 +47,13 @@ class ModelLearner:
         self.net_train_epochs = epochs
         self.useRNN = sequence_length > 1
         self.sequence_length = sequence_length
-        self.partial_obs_rate = partial_obs_rate
+        self.partial_obs_rate= partial_obs_rate
+        self.do_data_prepro = data_prepro
 
         # create replay memory using deque
         self.data_size = data_size
         self.memory = deque(maxlen=self.data_size)
+        self.delta_memory = deque(maxlen=self.data_size)
 
         # create main model and target model
         if self.useRNN:
@@ -76,6 +85,8 @@ class ModelLearner:
                                activations=('relu', 'relu'),
                                lr=.001):
         model = Sequential()
+        if self.partial_obs_rate > 0:
+            model.add(Dropout(self.partial_obs_rate,input_shape=(input_dim,)))
         model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
         for i in range(len(dim_multipliers) - 1):
             model.add(Dense(self.state_size * dim_multipliers[i + 1],
@@ -109,25 +120,6 @@ class ModelLearner:
         # model.summary()
         return model
 
-    def setup_batch_for_RNN(self, batch):
-        batch_size = batch.shape[0]
-        array_size = batch_size - self.sequence_length
-        x_seq = np.empty((array_size, self.sequence_length, self.state_size + self.action_size))
-        y_seq = np.empty((array_size, self.state_size))
-        actual_size = 0
-        for jj in range(array_size):
-            if not batch[jj:jj + self.sequence_length - 1, -1].any():
-                x_seq[actual_size, ...] = batch[np.newaxis,
-                                          jj:jj + self.sequence_length,
-                                          :self.state_size + self.action_size]
-                y_seq[actual_size, ...] = batch[np.newaxis,
-                                          jj + self.sequence_length - 1,
-                                          -self.state_size - 1:-1]
-                actual_size += 1
-        x_seq = np.resize(x_seq, (actual_size, self.sequence_length, self.state_size + self.action_size))
-        y_seq = np.resize(y_seq, (actual_size, self.state_size))
-        return x_seq, y_seq
-
     # approximate Done value
     # state is input and reward is output
     def build_dmodel(self,
@@ -152,13 +144,19 @@ class ModelLearner:
     def train_models(self, minibatch_size=32):
         batch_size = len(self.memory)
         minibatch_size = min(minibatch_size, batch_size)
-        batch = self.memory
+
+        batch = np.array(self.memory)
 
         if self.useRNN:
             t_x, t_y = self.setup_batch_for_RNN(batch)
         else:
             t_x = batch[:, :self.state_size + self.action_size]
-            t_y = batch[:, -self.state_size - 1:-1]
+            if self.do_data_prepro:
+                t_y = np.array(self.delta_memory)
+            else:
+                t_y = batch[:, -self.state_size - 1:-1]
+
+
 
         # and do the model fit
         self.tmodel.fit(t_x, t_y,
@@ -209,7 +207,10 @@ class ModelLearner:
             # get action for the current state and go one step in environment
             action = self.get_action(state, environment)
             next_state, reward, done, info = environment.step(action)
-
+            if self.do_data_prepro:
+                delta = self.data_prepro(next_state) - self.data_prepro(state)
+                self.memory.append(np.hstack((self.data_prepro(state), self.data_prepro(action), reward, self.data_prepro(next_state), done * 1)))
+                self.delta_memory.append(np.hstack((delta)))
             # save the sample <s, a, r, s'> to the replay memory
             self.memory.append(np.hstack((state, action, reward, next_state, done * 1)))
 
@@ -217,17 +218,34 @@ class ModelLearner:
                 state = environment.reset()
             else:
                 state = next_state
-        self.memory = np.array(self.memory)
-        rescaling_factor = self.memory.min()
-        self.memory = (abs(rescaling_factor) + 100) + self.memory
-        mask = np.random.choice([0, 1], size=self.memory.shape, p=[self.partial_obs_rate, 1-self.partial_obs_rate])
-        self.memory = mask * self.memory
+
+
+    def data_prepro(self, data):
+        epsilon = np.nextafter(0,1)
+        data = (data - K.backend.mean(data)) / (K.backend.std(data) + epsilon)
+        return data
+
+    def setup_batch_for_RNN(self, batch):
+        batch_size = batch.shape[0]
+        x_seq = np.empty((0, self.sequence_length, self.state_size + self.action_size))
+        y_seq = np.empty((0, self.state_size))
+        for jj in range(batch_size - self.sequence_length):
+            if not batch[jj:jj + self.sequence_length - 1, -1].any():
+                x_seq = np.concatenate((x_seq, batch[np.newaxis,
+                                               jj:jj + self.sequence_length,
+                                               :self.state_size + self.action_size]))
+                y_seq = np.concatenate((y_seq, batch[np.newaxis,
+                                               jj + self.sequence_length - 1,
+                                               -self.state_size - 1:-1]))
+                print(jj)
+        return x_seq, y_seq
 
 
     def run(self, environment, rounds=1):
         for e in range(rounds):
             self.refill_mem(environment)
             self.train_models()
+
 
     def evaluate(self, environment, num_steps=5000, do_plots=False):
         states, nexts_real, nexts_pred, rewards_real, rewards_pred, dones_real, dones_pred = [], [], [], [], [], [], []
@@ -271,19 +289,18 @@ class ModelLearner:
         mse = ((p - r) ** 2).mean()
         return mse
 
-
 def weighted_mean_squared_error(y_true, y_pred):
-    total = K.backend.sum(K.backend.square(K.backend.abs(K.backend.sign(y_true)) * (y_pred - y_true)), axis=-1)
+    total = K.backend.sum(K.backend.square(K.backend.abs(K.backend.sign(y_true))*(y_pred - y_true)), axis=-1)
     count = K.backend.sum(K.backend.abs(K.backend.sign(y_true)))
-    return total / count
+    return total/count
 
 
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['Ant-v1']:
+    for env_name in ['CartPole-v1']:
         env = gym.make(env_name)
 
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.3, sequence_length=5)
+        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0, sequence_length=1)
         canary.run(env, rounds=8)
 
         print('MSE: {}'.format(canary.evaluate(env)))
