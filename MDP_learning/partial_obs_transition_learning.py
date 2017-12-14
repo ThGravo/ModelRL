@@ -1,6 +1,6 @@
 import tensorflow as tf
 from collections import deque
-from keras.layers import Dense, LSTM, Dropout
+from keras.layers import Dense, LSTM, GRU
 from keras.optimizers import Adam
 from keras.models import Sequential
 import keras as K
@@ -12,6 +12,7 @@ import matplotlib
 # matplotlib.use('GTK3Cairo', warn=False, force=True)
 from collections import namedtuple
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import Imputer
 
 '''
 GRID SEARCH RESULT
@@ -21,7 +22,7 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=1500000, epochs=5, learning_rate=.001,
+    def __init__(self, observation_space, action_space, data_size=500000, epochs=50, learning_rate=.001,
                  tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
                  partial_obs_rate=0.0):
 
@@ -86,20 +87,101 @@ class ModelLearner:
             else:
                 state = next_state
 
+
     def make_mem_partial_obs(self, memory):
-        rescale_factor = abs(memory.min()) + 100
-        masks_states = np.random.choice([0, 1], size=(len(memory), self.state_size),
-                                          p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
-        masks_next_states = np.random.choice([0, 1], size=(len(memory), self.state_size),
-                                          p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        masks_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
+                                        p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        masks_next_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
+                                             p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        memory[:, self.state_size:self.state_size+1] = memory[:, self.state_size:self.state_size+1]
         for i in range(len(memory)):
             if i == 0 or memory[i - 1, -1]:
-                memory[i, :self.state_size] = masks_states[i] * (rescale_factor + memory[i, :self.state_size])
-                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * (rescale_factor + memory[i, self.state_size + self.action_size + 1:-1])
+                memory[i, :self.state_size] = masks_states[i] * memory[i, :self.state_size]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
             else:
                 memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
-                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * (rescale_factor + memory[i, self.state_size + self.action_size + 1:-1])
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
 
+
+
+    '''
+    
+        def make_mem_partial_obs(self, memory):
+        translation_value = abs(memory.min()) + 10
+        masks_states = np.random.choice([0.0, 1.0], size=(len(memory), self.state_size),
+                                        p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        masks_next_states = np.random.choice([0.0, 1.0], size=(len(memory), self.state_size),
+                                             p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        memory[:, self.state_size:self.state_size+1] = translation_value + memory[:, self.state_size:self.state_size+1]
+        for i in range(len(memory)):
+            if i == 0 or memory[i - 1, -1]:
+                memory[i, :self.state_size] = masks_states[i] * (translation_value + memory[i, :self.state_size])
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * (
+                translation_value + memory[i, self.state_size + self.action_size + 1:-1])
+            else:
+                memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * (
+                translation_value + memory[i, self.state_size + self.action_size + 1:-1])
+
+
+    def make_mem_partial_obs(self, memory):
+        translation_value = abs(memory.min()) + 100
+        masks_states = np.random.choice([0.0, 1.0], size=(len(memory), self.state_size),
+                                        p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        masks_next_states = np.random.choice([0.0, 1.0], size=(len(memory), self.state_size),
+                                             p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        for i in range(len(memory)):
+            if i == 0 or memory[i - 1, -1]:
+                memory[i, :self.state_size] = masks_states[i] * (translation_value + memory[i, :self.state_size])
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * (
+                translation_value + memory[i, self.state_size + self.action_size + 1:-1])
+            else:
+                memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * (
+                translation_value + memory[i, self.state_size + self.action_size + 1:-1])
+
+
+    def make_mem_partial_obs(self, memory):
+        translation_value = abs(memory.min()) + 100
+        masks_states = np.random.choice([translation_value, 1.0], size=(len(memory), self.state_size),
+                                        p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        masks_next_states = np.random.choice([translation_value, 1.0], size=(len(memory), self.state_size),
+                                             p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        for i in range(len(memory)):
+            if i == 0 or memory[i - 1, -1]:
+                memory[i, :self.state_size] = masks_states[i] + memory[i, :self.state_size]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] + memory[i, self.state_size + self.action_size + 1:-1]
+            else:
+                memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] + memory[i, self.state_size + self.action_size + 1:-1]
+    
+    def setup_batch_for_RNN(self, batch):
+        batch_size = batch.shape[0]
+        array_size = batch_size - self.sequence_length
+        x_seq = np.empty((array_size, self.sequence_length, self.state_size + self.action_size))
+        y_seq = np.empty((array_size, self.state_size))
+        actual_size = 0
+        #jjs = {}
+        for jj in range(array_size):
+            if all([all(v != 0.0 for state in batch[jj:jj + self.sequence_length, :self.state_size] for v in state),
+                    all(v != 0.0 for state in batch[jj:jj + self.sequence_length, -self.state_size - 1:-1] for v in state),
+                    not batch[jj:jj + self.sequence_length - 1, -1].any()]):
+                        jjs[jj] = actual_size
+                        x_seq[actual_size, ...] = batch[np.newaxis,
+                                                  jj:jj + self.sequence_length,
+                                                  :self.state_size + self.action_size]
+                        y_seq[actual_size, ...] = batch[np.newaxis,
+                                                  jj + self.sequence_length - 1,
+                                                  -self.state_size - 1:-1]
+                        actual_size += 1
+        #jjs = sorted(jjs)
+        x_seq = np.resize(x_seq, (actual_size, self.sequence_length, self.state_size + self.action_size))
+        y_seq = np.resize(y_seq, (actual_size, self.state_size))
+        np.random.shuffle(x_seq)
+        np.random.shuffle(y_seq)
+        return x_seq, y_seq
+        
+    '''
 
     def setup_batch_for_RNN(self, batch):
         batch_size = batch.shape[0]
@@ -121,14 +203,13 @@ class ModelLearner:
         return x_seq, y_seq
 
 
-
     # approximate Transition function
     # state and action is input and successor state is output
     def build_regression_model(self,
                                input_dim,
                                output_dim,
                                dim_multipliers=(6, 4),
-                               activations=('relu', 'relu'),
+                               activations=('sigmoid', 'sigmoid'),
                                lr=.001):
         model = Sequential()
         model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
@@ -137,7 +218,7 @@ class ModelLearner:
                             activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
         if self.partial_obs_rate > 0:
-            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+            model.compile(loss=weighted_mean_squared_error, optimizer=Adam(lr=lr), metrics=['accuracy'])
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         # model.summary()
         return model
@@ -146,7 +227,7 @@ class ModelLearner:
                                          input_dim,
                                          output_dim,
                                          dim_multipliers=(6, 4),
-                                         activations=('relu', 'relu'),
+                                         activations=('sigmoid', 'sigmoid'),
                                          lr=.001):
         num_hlayers = len(dim_multipliers)
         model = Sequential()
@@ -160,11 +241,12 @@ class ModelLearner:
                            activation=activations[min(i + 1, len(activations) - 1)],
                            return_sequences=i is not num_hlayers - 2))
             # stacked LSTMs need to return a sequence
-        model.add(Dense(output_dim, activation='linear'))
+        model.add(Dense(output_dim, activation='relu'))
+        if self.partial_obs_rate > 0:
+            model.compile(loss=weighted_mean_squared_error, optimizer=Adam(lr=lr), metrics=['accuracy'])
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         # model.summary()
         return model
-
 
     # approximate Done value
     # state is input and reward is output
@@ -182,16 +264,18 @@ class ModelLearner:
         # model.summary()
         return model
 
-
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
         memory_arr = np.array(self.memory)
         if self.partial_obs_rate > 0:
             self.make_mem_partial_obs(memory_arr)
+            imputer = Imputer()
+            imputed_memory = imputer.fit_transform(self.memory)
+
         if self.useRNN:
             batch_size = len(memory_arr)
             minibatch_size = min(minibatch_size, batch_size)
-            t_x, t_y = self.setup_batch_for_RNN(memory_arr)
+            t_x, t_y = self.setup_batch_for_RNN(imputed_memory)
             self.tmodel.fit(t_x, t_y,
                             batch_size=minibatch_size,
                             epochs=self.net_train_epochs,
@@ -200,13 +284,14 @@ class ModelLearner:
         else:
             batch_size = len(memory_arr)
             minibatch_size = min(minibatch_size, batch_size)
-            batch = random.sample(list(memory_arr), minibatch_size)
-            batch = np.array(batch)
+            batch = random.sample(list(imputed_memory), minibatch_size)
+            # batch = np.array(batch)
+            batch = imputed_memory
             t_x = batch[:, :self.state_size + self.action_size]
             t_y = batch[:, -self.state_size - 1:-1]
             self.tmodel.fit(t_x, t_y,
                             batch_size=minibatch_size,
-                            epochs=self.net_train_epochs*100000,
+                            epochs=self.net_train_epochs * 100000,
                             validation_split=0.1,
                             callbacks=self.Ttensorboard, verbose=1)
 
@@ -244,8 +329,6 @@ class ModelLearner:
         return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .8)
         # TODO how sure do we want to be about being done? 80%? 90?
         # TODO yah to force the type to be the same as in gym environment (flatten?)
-
-
 
     def run(self, environment, rounds=1):
         for e in range(rounds):
@@ -299,7 +382,6 @@ def weighted_mean_squared_error(y_true, y_pred):
     total = K.backend.sum(K.backend.square(K.backend.abs(K.backend.sign(y_true)) * (y_pred - y_true)), axis=-1)
     count = K.backend.sum(K.backend.abs(K.backend.sign(y_true)))
     return total / count
-
 
 
 if __name__ == "__main__":

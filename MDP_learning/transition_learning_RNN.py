@@ -20,7 +20,7 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=50000, epochs=5, learning_rate=.001,
+    def __init__(self, observation_space, action_space, data_size=500000, epochs=5, learning_rate=.001,
                  tmodel_dim_multipliers=(12, 12), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
                  partial_obs_rate=0.0):
 
