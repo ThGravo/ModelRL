@@ -137,7 +137,7 @@ class ModelLearner:
                             activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
         if self.partial_obs_rate > 0:
-            model.compile(loss=weighted_mean_squared_error, optimizer=Adam(lr=lr), metrics=['accuracy'])
+            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         # model.summary()
         return model
@@ -307,7 +307,7 @@ if __name__ == "__main__":
     for env_name in ['CartPole-v1']:
         env = gym.make(env_name)
 
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.1, sequence_length=10)
+        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.1, sequence_length=1)
         canary.run(env, rounds=1)
 
         print('MSE: {}'.format(canary.evaluate(env)))
