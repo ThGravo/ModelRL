@@ -87,7 +87,10 @@ class ModelLearner:
             print(model.summary())
         return model
 
-
+    def weighted_mean_squared_error(y_true, y_pred):
+        total = K.backend.sum(K.backend.square(K.backend.abs(K.backend.sign(y_true)) * (y_pred - y_true)), axis=-1)
+        count = K.backend.sum(K.backend.abs(K.backend.sign(y_true)))
+        return total / count
 
     # approximate Done value
     # state is input and reward is output
