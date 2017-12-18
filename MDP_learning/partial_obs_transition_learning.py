@@ -89,6 +89,33 @@ class ModelLearner:
                 state = next_state
 
 
+
+
+    def norm_mem(self, memory):
+        masks_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
+                                        p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        masks_next_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
+                                             p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        memory[:, self.state_size:self.state_size+1] = memory[:, self.state_size:self.state_size+1]
+        for i in range(len(memory)):
+            if i == 0 or memory[i - 1, -1]:
+                memory[i, :self.state_size] = masks_states[i] * memory[i, :self.state_size]
+                memory[i, :self.state_size][np.isnan(memory[i, :self.state_size])] = 0
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
+                for j in range(self.state_size):
+                    if np.isnan(memory[i, self.state_size + self.action_size + 1:-1][j]):
+                        memory[i, self.state_size + self.action_size + 1:-1][j] = memory[i, :self.state_size][j]
+            else:
+                memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
+                for j in range(self.state_size):
+                    if np.isnan(memory[i, self.state_size + self.action_size + 1:-1][j]):
+                        memory[i, self.state_size + self.action_size + 1:-1][j] = memory[i, :self.state_size][j]
+
+
+
+
+
     def make_mem_partial_obs(self, memory):
         masks_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
                                         p=[self.partial_obs_rate, 1 - self.partial_obs_rate])

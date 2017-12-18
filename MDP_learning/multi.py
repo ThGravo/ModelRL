@@ -1,3 +1,5 @@
+from MDP_learning import make_env
+
 import tensorflow as tf
 
 from collections import deque
@@ -20,34 +22,33 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=10000, epochs=4, learning_rate=.001,
+    def __init__(self, env, data_size=10000, epochs=4, learning_rate=.001,
                  tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), recurrent=False):
 
+        self.env = env
+        self.n = self.env.n # number of agents
         # get size of state and action from environment
-        self.state_size = sum(observation_space.shape)
-        self.action_size = 1
-        self.action_num = 0
-        if isinstance(action_space, gym.spaces.Discrete):
-            self.action_num = action_space.n
-        elif isinstance(action_space, gym.spaces.Box):
-            self.action_size = sum(action_space.shape)
-        else:
-            raise ValueError("The action_space is of type: {} - which is not supported!".format(type(action_space)))
-
+        self.state_size = []
+        self.action_num = []
+        self.action_size = 5
+        for i in range(self.n):
+            self.state_size.append(sum(self.env.observation_space[i].shape))
+            self.action_num.append(env.action_space[i].n)  # assuming discrete action spaces
         self.learning_rate = learning_rate
         self.net_train_epochs = epochs
         self.data_size = data_size
         self.memory = deque(maxlen=self.data_size)
         self.recurrent = recurrent
-
-
-        self.tmodel = self.build_regression_model(self.state_size + self.action_size, self.state_size, lr=learning_rate,
+        self.tmodel = []
+        for i in range(self.n):
+            model = self.build_regression_model(self.state_size[i] + self.action_size, self.state_size[i], lr=learning_rate,
                                                   dim_multipliers=tmodel_dim_multipliers,
                                                   activations=tmodel_activations)
-        self.rmodel = self.build_regression_model(self.state_size, 1, lr=learning_rate,
+            self.tmodel.append(model)
+        self.rmodel = self.build_regression_model(100, 1, lr=learning_rate,
                                                   dim_multipliers=(4, 4),
                                                   activations=('sigmoid', 'sigmoid'))
-        self.dmodel = self.build_dmodel(self.state_size)
+        self.dmodel = self.build_dmodel(100)
 
         self.Ttensorboard = []  # [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
         self.Rtensorboard = []  # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
@@ -67,9 +68,9 @@ class ModelLearner:
             model.add(Dense(output_dim, activation='linear'))
             model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         else:
-            model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
+            model.add(Dense(20 * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
             for i in range(len(dim_multipliers) - 1):
-                model.add(Dense(self.state_size * dim_multipliers[i + 1],
+                model.add(Dense(20 * dim_multipliers[i + 1],
                                 activation=activations[min(i + 1, len(activations) - 1)]))
             model.add(Dense(output_dim, activation='linear'))
             model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
@@ -85,9 +86,9 @@ class ModelLearner:
                      activations=('relu', 'relu'),
                      lr=.001):
         model = Sequential()
-        model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
+        model.add(Dense(20 * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
         for i in range(len(dim_multipliers) - 1):
-            model.add(Dense(self.state_size * dim_multipliers[i + 1], activation=activations[i + 1]))
+            model.add(Dense(20 * dim_multipliers[i + 1], activation=activations[i + 1]))
         model.add(Dense(1, activation='sigmoid'))
         model.compile(loss='binary_crossentropy', optimizer=Adam(lr=lr), metrics=['accuracy'])
         # model.summary()
@@ -95,7 +96,11 @@ class ModelLearner:
 
     # get action from model using random policy
     def get_action(self, state, environment):
-        return environment.action_space.sample()
+        actions = []
+        for i in range(self.n):
+            act = np.array([random.uniform(-2,2) for j in range(env.action_space[i].n)])
+            actions.append(act)
+        return actions
 
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
@@ -103,14 +108,19 @@ class ModelLearner:
         minibatch_size = min(minibatch_size, batch_size)
 
         batch = np.array(self.memory)
-
+        state_batch = np.array([_[0] for _ in batch])
+        action_batch = np.array([_[1] for _ in batch])
+        reward_batch = np.array([_[2] for _ in batch])
+        next_state_batch = np.array([_[4] for _ in batch])
+        done_batch = np.array([_[3] for _ in batch])
         # and do the model fit
-        self.tmodel.fit(batch[:, :self.state_size + self.action_size],
-                        batch[:, -self.state_size - 1:-1],
-                        batch_size=minibatch_size,
-                        epochs=self.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=self.Ttensorboard, verbose=1)
+        for i in range(self.n):
+            self.tmodel[i].fit(np.concatenate(state_batch[i],action_batch[i], axis=1),
+                            next_state_batch[i],
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Ttensorboard, verbose=1)
 
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
@@ -150,7 +160,7 @@ class ModelLearner:
             next_state, reward, done, info = environment.step(action)
 
             # save the sample <s, a, r, s'> to the replay memory
-            self.memory.append(np.hstack((state, action, reward, next_state, done * 1)))
+            self.memory.append((state, action, reward, next_state, done * 1))
 
             if done:  # and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
                 state = environment.reset()
@@ -206,10 +216,13 @@ class ModelLearner:
 
 
 if __name__ == "__main__":
-    for env_name in ['Ant-v1']:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-        env = gym.make(env_name)
+        env_name = 'simple_spread'
+        env = make_env.make_env(env_name)
+        # print(env.action_space)
+        # x = env.step([np.array([0,0,1,0,0]),np.array([0,0,1,0,0]),np.array([1,0,0,0,0])])
+        # print(x)
 
-        canary = ModelLearner(env.observation_space, env.action_space)
+        canary = ModelLearner(env)
         canary.run(env, rounds=8)
 
         print('MSE: {}'.format(canary.evaluate(env)))
