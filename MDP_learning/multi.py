@@ -14,16 +14,9 @@ import matplotlib
 # matplotlib.use('GTK3Cairo', warn=False, force=True)
 import matplotlib.pyplot as plt
 
-'''
-GRID SEARCH RESULT
-Best parameter set was 
-{'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)}
-'''
-
-
 class ModelLearner:
-    def __init__(self, env, data_size=10000, epochs=4, learning_rate=.001,
-                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), recurrent=False):
+    def __init__(self, env, data_size=300000, epochs=4, learning_rate=.001,
+                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'relu'), recurrent=False):
 
         self.env = env
         self.n = self.env.n # number of agents
@@ -41,7 +34,7 @@ class ModelLearner:
         self.recurrent = recurrent
         self.tmodel = []
         for i in range(self.n):
-            model = self.build_regression_model(self.state_size[i] + self.action_size, self.state_size[i], lr=learning_rate,
+            model = self.build_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
                                                   dim_multipliers=tmodel_dim_multipliers,
                                                   activations=tmodel_activations)
             self.tmodel.append(model)
@@ -106,17 +99,23 @@ class ModelLearner:
     def train_models(self, minibatch_size=32):
         batch_size = len(self.memory)
         minibatch_size = min(minibatch_size, batch_size)
-
         batch = np.array(self.memory)
         state_batch = np.array([_[0] for _ in batch])
         action_batch = np.array([_[1] for _ in batch])
         reward_batch = np.array([_[2] for _ in batch])
-        next_state_batch = np.array([_[4] for _ in batch])
-        done_batch = np.array([_[3] for _ in batch])
+        next_state_batch = np.array([_[3] for _ in batch])
+        done_batch = np.array([_[4] for _ in batch])
+
+        # only private obs and action [np.hstack((state_batch[_,i],action_batch[_,i]))) for _ in range(batch.shape[0])]
+        # all actions observable [np.hstack((state_batch[_,i],np.hstack(action_batch[_,...]))) for _ in range(batch.shape[0])]
+        # everything observable [np.hstack((np.hstack(state_batch[_,...]),np.hstack(action_batch[_,...]))) for _ in range(batch.shape[0])]
+
         # and do the model fit
         for i in range(self.n):
-            self.tmodel[i].fit(np.concatenate(state_batch[i],action_batch[i], axis=1),
-                            next_state_batch[i],
+            print("Training agent " + str(i))
+            self.tmodel[i].fit(np.array([np.hstack((state_batch[_,i],np.hstack(action_batch[_,...])))
+                                         for _ in range(batch.shape[0])]),
+                               np.array([np.hstack(next_state_batch[_, i]) for _ in range(batch.shape[0])]),
                             batch_size=minibatch_size,
                             epochs=self.net_train_epochs,
                             validation_split=0.1,
@@ -124,6 +123,7 @@ class ModelLearner:
 
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
+        '''
         self.rmodel.fit(batch[:, :self.state_size],
                         batch[:, self.state_size + self.action_size],
                         batch_size=minibatch_size,
@@ -137,7 +137,7 @@ class ModelLearner:
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
                         callbacks=self.Dtensorboard, verbose=0)
-
+        '''
     def step(self, state, action):
         batch_size = 1
         state = np.reshape(state, [1, self.state_size])
