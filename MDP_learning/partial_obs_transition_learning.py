@@ -14,6 +14,7 @@ import matplotlib
 from collections import namedtuple
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import Imputer
+from fancyimpute import KNN, SimpleFill, SoftImpute,MICE
 
 '''
 GRID SEARCH RESULT
@@ -23,7 +24,7 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=50000, epochs=50, learning_rate=.001,
+    def __init__(self, observation_space, action_space, data_size=200000, epochs=10, learning_rate=.001,
                  tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
                  partial_obs_rate=0.0):
 
@@ -88,34 +89,6 @@ class ModelLearner:
             else:
                 state = next_state
 
-
-
-
-    def norm_mem(self, memory):
-        masks_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
-                                        p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
-        masks_next_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
-                                             p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
-        memory[:, self.state_size:self.state_size+1] = memory[:, self.state_size:self.state_size+1]
-        for i in range(len(memory)):
-            if i == 0 or memory[i - 1, -1]:
-                memory[i, :self.state_size] = masks_states[i] * memory[i, :self.state_size]
-                memory[i, :self.state_size][np.isnan(memory[i, :self.state_size])] = 0
-                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
-                for j in range(self.state_size):
-                    if np.isnan(memory[i, self.state_size + self.action_size + 1:-1][j]):
-                        memory[i, self.state_size + self.action_size + 1:-1][j] = memory[i, :self.state_size][j]
-            else:
-                memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
-                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
-                for j in range(self.state_size):
-                    if np.isnan(memory[i, self.state_size + self.action_size + 1:-1][j]):
-                        memory[i, self.state_size + self.action_size + 1:-1][j] = memory[i, :self.state_size][j]
-
-
-
-
-
     def make_mem_partial_obs(self, memory):
         masks_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
                                         p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
@@ -125,17 +98,10 @@ class ModelLearner:
         for i in range(len(memory)):
             if i == 0 or memory[i - 1, -1]:
                 memory[i, :self.state_size] = masks_states[i] * memory[i, :self.state_size]
-                memory[i, :self.state_size][np.isnan(memory[i, :self.state_size])] = 0
                 memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
-                for j in range(self.state_size):
-                    if np.isnan(memory[i, self.state_size + self.action_size + 1:-1][j]):
-                        memory[i, self.state_size + self.action_size + 1:-1][j] = memory[i, :self.state_size][j]
             else:
                 memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
                 memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
-                for j in range(self.state_size):
-                    if np.isnan(memory[i, self.state_size + self.action_size + 1:-1][j]):
-                        memory[i, self.state_size + self.action_size + 1:-1][j] = memory[i, :self.state_size][j]
 
 
     def setup_batch_for_RNN(self, batch):
@@ -222,16 +188,17 @@ class ModelLearner:
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
         memory_arr = np.array(self.memory)
+
         if self.partial_obs_rate > 0:
             self.make_mem_partial_obs(memory_arr)
-            #imputer = Imputer()
-            #imputed_memory = imputer.fit_transform(memory_arr)
-            imputed_memory = memory_arr
 
-
+        #memory_train = np.array([exp for exp in memory_arr if not np.isnan(exp[-self.state_size - 1:-1]).any()])
+        #imputer = Imputer()
+        #imputed_memory = imputer.fit_transform(memory_train)
+        imputed_memory = SoftImpute().complete(memory_arr)
 
         if self.useRNN:
-            batch_size = len(memory_arr)
+            batch_size = len(imputed_memory)
             minibatch_size = min(minibatch_size, batch_size)
             t_x, t_y = self.setup_batch_for_RNN(imputed_memory)
             self.tmodel.fit(t_x, t_y,
@@ -244,12 +211,12 @@ class ModelLearner:
             minibatch_size = min(minibatch_size, batch_size)
             # batch = random.sample(list(imputed_memory), minibatch_size)
             # batch = np.array(batch)
-            batch = imputed_memory
-            t_x = batch[:, :self.state_size + self.action_size]
-            t_y = batch[:, -self.state_size - 1:-1]
+            # batch = memory_arr
+            t_x = imputed_memory[:, :self.state_size + self.action_size]
+            t_y = imputed_memory[:, -self.state_size - 1:-1]
             self.tmodel.fit(t_x, t_y,
                             batch_size=minibatch_size,
-                            epochs=self.net_train_epochs * 100000,
+                            epochs=self.net_train_epochs,
                             validation_split=0.1,
                             callbacks=self.Ttensorboard, verbose=1)
 
@@ -344,10 +311,10 @@ def weighted_mean_squared_error(y_true, y_pred):
 
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['CartPole-v1']:
+    for env_name in ['Ant-v1']:
         env = gym.make(env_name)
 
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.1, sequence_length=1)
+        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.5, sequence_length=1)
         canary.run(env, rounds=1)
 
         print('MSE: {}'.format(canary.evaluate(env)))
