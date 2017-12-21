@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 class ModelLearner:
     def __init__(self, env, data_size=300000, epochs=4, learning_rate=.001,
-                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'relu'), recurrent=False):
+                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'relu'), sequence_length=1):
 
         self.env = env
         self.n = self.env.n # number of agents
@@ -31,13 +31,22 @@ class ModelLearner:
         self.net_train_epochs = epochs
         self.data_size = data_size
         self.memory = deque(maxlen=self.data_size)
-        self.recurrent = recurrent
+        self.useRNN = sequence_length > 1
+        self.sequence_length = sequence_length
         self.tmodel = []
-        for i in range(self.n):
-            model = self.build_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
-                                                  dim_multipliers=tmodel_dim_multipliers,
-                                                  activations=tmodel_activations)
+        if self.useRNN:
+            model = self.build_recurrent_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
+                                                      dim_multipliers=tmodel_dim_multipliers,
+                                                      activations=tmodel_activations)
+            self.seq_mem = deque(maxlen=self.sequence_length)
             self.tmodel.append(model)
+        else:
+            model = self.build_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
+                                                      dim_multipliers=tmodel_dim_multipliers,
+                                                      activations=tmodel_activations)
+            self.tmodel.append(model)
+
+
         self.rmodel = self.build_regression_model(100, 1, lr=learning_rate,
                                                   dim_multipliers=(4, 4),
                                                   activations=('sigmoid', 'sigmoid'))
@@ -166,6 +175,25 @@ class ModelLearner:
                 state = environment.reset()
             else:
                 state = next_state
+
+    def setup_batch_for_RNN(self, batch):
+        batch_size = batch.shape[0]
+        array_size = batch_size - self.sequence_length
+        actual_size = 0
+        state_batch = np.array([_[0] for _ in batch])
+        action_batch = np.array([_[1] for _ in batch])
+        next_state_batch = np.array([_[3] for _ in batch])
+        done_batch = np.array([_[4] for _ in batch])
+        for i in range(array_size):
+            if not done_batch[i:i + self.sequence_length - 1].any():
+                x_seq_states[actual_size, ...] = state_batch[i:i + self.sequence_length,...]
+                x_seq_actions[actual_size, ...] = action_batch[i:i + self.sequence_length, ...]
+                y_seq[actual_size, ...] = next_state_batch[i + self.sequence_length,...]
+                actual_size += 1
+        x_seq = np.resize(x_seq, (actual_size, self.sequence_length, self.state_size + self.action_size))
+        y_seq = np.resize(y_seq, (actual_size, self.state_size))
+        return x_seq_states, x_seq_actions, y_seq
+
 
     def run(self, environment, rounds=1):
         for e in range(rounds):

@@ -24,7 +24,7 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=5000000, epochs=5, learning_rate=.001,
+    def __init__(self, observation_space, action_space, data_size=2000000, epochs=5, learning_rate=.001,
                  tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
                  partial_obs_rate=0.0):
 
@@ -321,12 +321,25 @@ def weighted_mean_squared_error(y_true, y_pred):
 
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['BipedalWalker-v2']:
-        env = gym.make(env_name)
-        print(env.observation_space)
+    for env_name in ['BipedalWalker-v2', 'LunarLander-v2', 'Ant-v1']:
+        print(env_name)
+        for round in range(10):
+            print(round)
+            env = gym.make(env_name)
+            canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.0, sequence_length=1)
+            canary.refill_mem(env)
+            memory_arr = np.array(canary.memory)
+            print("Saving memory")
+            np.save('/home/aocc/code/DL/MDP_learning/save_memory/' + str(env_name) + 'FULL' + 'round' + str(round), memory_arr)
+            for rate in [0.1, 0.2, 0.3]:
+                print(rate)
+                canary1 = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=rate, sequence_length=1)
+                canary1.memory = canary.memory
+                memory_arr = np.array(canary1.memory)
+                canary1.make_mem_partial_obs(memory_arr)
+                print("Saving corrupted memory")
+                np.save('/home/aocc/code/DL/MDP_learning/save_memory/' + str(env_name) + 'CORRUPT' + str(rate) + 'round' + str(round), memory_arr)
+                memory_final = SoftImpute().complete(memory_arr)
+                print("Saving imputed memory")
+                np.save('/home/aocc/code/DL/MDP_learning/save_memory/' + str(env_name) + 'IMPUTED' + str(rate) + 'round' + str(round), memory_final)
 
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.1, sequence_length=1)
-        #canary.refill_mem(env)
-        canary.run(env, rounds=1)
-
-        print('MSE: {}'.format(canary.evaluate(env)))

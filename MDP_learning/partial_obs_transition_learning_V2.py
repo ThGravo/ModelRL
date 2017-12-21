@@ -24,8 +24,8 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=5000000, epochs=5, learning_rate=.001,
-                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
+    def __init__(self, observation_space, action_space, data_size=75000, epochs=4000, learning_rate=.001,
+                 tmodel_dim_multipliers=(1, 1), tmodel_activations=('relu', 'relu'), sequence_length=1,
                  partial_obs_rate=0.0):
 
         # get size of state and action from environment
@@ -133,9 +133,9 @@ class ModelLearner:
                                activations=('sigmoid', 'sigmoid'),
                                lr=.001):
         model = Sequential()
-        model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
+        model.add(Dense(1000, input_dim=input_dim, activation=activations[0]))
         for i in range(len(dim_multipliers) - 1):
-            model.add(Dense(self.state_size * dim_multipliers[i + 1],
+            model.add(Dense(1000,
                             activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
         if self.partial_obs_rate > 0:
@@ -186,10 +186,10 @@ class ModelLearner:
         return model
 
     # pick samples randomly from replay memory (with batch_size)
-    def train_models(self, minibatch_size=32):
-        memory_arr = np.array(self.memory)
-        file = "memoryBW.npy"
-        np.save(file, memory_arr)
+    def train_models(self, minibatch_size=512):
+        #file = "memoryV2.npy"
+        #np.save(file, np.array(self.memory))
+        memory_arr = np.array(random.sample(list(np.array(self.memory)),100000))
 
         if self.partial_obs_rate > 0:
             self.make_mem_partial_obs(memory_arr)
@@ -223,7 +223,7 @@ class ModelLearner:
             # batch = np.array(batch)
             # batch = memory_arr
             t_x = memory_final[:, :self.state_size + self.action_size]
-            t_y = memory_final[:, -self.state_size - 1:-1]
+            t_y = memory_final[:, -self.state_size - 1:-1] - memory_final[:, :self.state_size]
             self.tmodel.fit(t_x, t_y,
                             batch_size=minibatch_size,
                             epochs=self.net_train_epochs,
@@ -324,9 +324,18 @@ if __name__ == "__main__":
     for env_name in ['BipedalWalker-v2']:
         env = gym.make(env_name)
         print(env.observation_space)
-
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.1, sequence_length=1)
+        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.0, sequence_length=1)
         #canary.refill_mem(env)
-        canary.run(env, rounds=1)
+        print("loading memory")
+        canary.memory = np.load('/home/aocc/code/DL/MDP_learning/save_memory/first_20mill/BipedalWalker-v2FULL.npy')
+        print(canary.memory.shape)
+        t_x = canary.memory[:, :canary.state_size + canary.action_size]
+        t_y = canary.memory[:, -canary.state_size - 1:-1] - canary.memory[:, :canary.state_size]
+        canary.tmodel.fit(t_x, t_y,
+                        batch_size=512,
+                        epochs=canary.net_train_epochs,
+                        validation_split=0.1,
+                        callbacks=canary.Ttensorboard, verbose=1)
+        #canary.run(env, rounds=1)
 
         print('MSE: {}'.format(canary.evaluate(env)))
