@@ -15,7 +15,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 class ModelLearner:
-    def __init__(self, env, data_size=300000, epochs=4, learning_rate=.001,
+    def __init__(self, env, data_size=3000, epochs=4, learning_rate=.001,
                  tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'relu'), sequence_length=1):
 
         self.env = env
@@ -34,24 +34,24 @@ class ModelLearner:
         self.useRNN = sequence_length > 1
         self.sequence_length = sequence_length
         self.tmodel = []
-        if self.useRNN:
-            model = self.build_recurrent_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
-                                                      dim_multipliers=tmodel_dim_multipliers,
-                                                      activations=tmodel_activations)
-            self.seq_mem = deque(maxlen=self.sequence_length)
-            self.tmodel.append(model)
-        else:
-            model = self.build_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
-                                                      dim_multipliers=tmodel_dim_multipliers,
-                                                      activations=tmodel_activations)
-            self.tmodel.append(model)
-
-
+        for i in range(self.n):
+            if self.useRNN:
+                model = self.build_recurrent_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
+                                                          dim_multipliers=tmodel_dim_multipliers,
+                                                          activations=tmodel_activations)
+                self.seq_mem = deque(maxlen=self.sequence_length)
+                self.tmodel.append(model)
+            else:
+                model = self.build_regression_model(self.state_size[i] + self.n* self.action_size, self.state_size[i], lr=learning_rate,
+                                                          dim_multipliers=tmodel_dim_multipliers,
+                                                          activations=tmodel_activations)
+                self.tmodel.append(model)
+        '''
         self.rmodel = self.build_regression_model(100, 1, lr=learning_rate,
                                                   dim_multipliers=(4, 4),
                                                   activations=('sigmoid', 'sigmoid'))
         self.dmodel = self.build_dmodel(100)
-
+        '''
         self.Ttensorboard = []  # [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
         self.Rtensorboard = []  # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
         self.Dtensorboard = []  # [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
@@ -65,19 +65,38 @@ class ModelLearner:
                                activations=('relu', 'relu'),
                                lr=.001):
         model = Sequential()
-        if self.recurrent:
-            model.add(LSTM(64,input_dim=1))
-            model.add(Dense(output_dim, activation='linear'))
-            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        else:
-            model.add(Dense(20 * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
-            for i in range(len(dim_multipliers) - 1):
-                model.add(Dense(20 * dim_multipliers[i + 1],
-                                activation=activations[min(i + 1, len(activations) - 1)]))
-            model.add(Dense(output_dim, activation='linear'))
-            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.add(Dense(500, input_dim=input_dim, activation=activations[0]))
+        for i in range(len(dim_multipliers) - 1):
+            model.add(Dense(500,
+                            activation=activations[min(i + 1, len(activations) - 1)]))
+        model.add(Dense(output_dim, activation='linear'))
+        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         model.summary()
         return model
+
+    def build_recurrent_regression_model(self,
+                                         input_dim,
+                                         output_dim,
+                                         dim_multipliers=(6, 4),
+                                         activations=('sigmoid', 'sigmoid'),
+                                         lr=.001):
+        num_hlayers = len(dim_multipliers)
+        model = Sequential()
+        model.add(LSTM(1000,
+                       input_shape=(None, input_dim),
+                       activation=activations[0],
+                       return_sequences=num_hlayers is not 1
+                       ))
+        for i in range(num_hlayers - 1):
+            model.add(LSTM(1000,
+                           activation=activations[min(i + 1, len(activations) - 1)],
+                           return_sequences=i is not num_hlayers - 2))
+            # stacked LSTMs need to return a sequence
+        model.add(Dense(output_dim, activation='relu'))
+        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.summary()
+        return model
+
 
 
     # approximate Done value
@@ -109,26 +128,35 @@ class ModelLearner:
         batch_size = len(self.memory)
         minibatch_size = min(minibatch_size, batch_size)
         batch = np.array(self.memory)
-        state_batch = np.array([_[0] for _ in batch])
-        action_batch = np.array([_[1] for _ in batch])
-        reward_batch = np.array([_[2] for _ in batch])
-        next_state_batch = np.array([_[3] for _ in batch])
-        done_batch = np.array([_[4] for _ in batch])
-
-        # only private obs and action [np.hstack((state_batch[_,i],action_batch[_,i]))) for _ in range(batch.shape[0])]
-        # all actions observable [np.hstack((state_batch[_,i],np.hstack(action_batch[_,...]))) for _ in range(batch.shape[0])]
-        # everything observable [np.hstack((np.hstack(state_batch[_,...]),np.hstack(action_batch[_,...]))) for _ in range(batch.shape[0])]
-
-        # and do the model fit
-        for i in range(self.n):
-            print("Training agent " + str(i))
-            self.tmodel[i].fit(np.array([np.hstack((state_batch[_,i],np.hstack(action_batch[_,...])))
-                                         for _ in range(batch.shape[0])]),
-                               np.array([np.hstack(next_state_batch[_, i]) for _ in range(batch.shape[0])]),
+        if self.useRNN:
+            t_x, t_y = self.setup_batch_for_RNN(batch)
+            self.tmodel.fit(t_x, t_y,
                             batch_size=minibatch_size,
                             epochs=self.net_train_epochs,
                             validation_split=0.1,
                             callbacks=self.Ttensorboard, verbose=1)
+
+        else:
+            state_batch = np.array([_[0] for _ in batch])
+            action_batch = np.array([_[1] for _ in batch])
+            reward_batch = np.array([_[2] for _ in batch])
+            next_state_batch = np.array([_[3] for _ in batch])
+            done_batch = np.array([_[4] for _ in batch])
+
+            # only private obs and action [np.hstack((state_batch[_,i],action_batch[_,i]))) for _ in range(batch.shape[0])]
+            # all actions observable [np.hstack((state_batch[_,i],np.hstack(action_batch[_,...]))) for _ in range(batch.shape[0])]
+            # everything observable [np.hstack((np.hstack(state_batch[_,...]),np.hstack(action_batch[_,...]))) for _ in range(batch.shape[0])]
+
+            # and do the model fit
+            for i in range(self.n):
+                print("Training agent " + str(i))
+                self.tmodel[i].fit(np.array([np.hstack((state_batch[_,i],np.hstack(action_batch[_,...])))
+                                             for _ in range(batch.shape[0])]),
+                                   np.array([np.hstack(next_state_batch[_, i]) for _ in range(batch.shape[0])]),
+                                batch_size=minibatch_size,
+                                epochs=self.net_train_epochs,
+                                validation_split=0.1,
+                                callbacks=self.Ttensorboard, verbose=1)
 
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
@@ -179,6 +207,8 @@ class ModelLearner:
     def setup_batch_for_RNN(self, batch):
         batch_size = batch.shape[0]
         array_size = batch_size - self.sequence_length
+        x_seq = np.empty((array_size, self.sequence_length, 2*self.n))
+        y_seq = np.empty((array_size, self.n))
         actual_size = 0
         state_batch = np.array([_[0] for _ in batch])
         action_batch = np.array([_[1] for _ in batch])
@@ -186,13 +216,13 @@ class ModelLearner:
         done_batch = np.array([_[4] for _ in batch])
         for i in range(array_size):
             if not done_batch[i:i + self.sequence_length - 1].any():
-                x_seq_states[actual_size, ...] = state_batch[i:i + self.sequence_length,...]
-                x_seq_actions[actual_size, ...] = action_batch[i:i + self.sequence_length, ...]
-                y_seq[actual_size, ...] = next_state_batch[i + self.sequence_length,...]
+                s_and_a = np.hstack((state_batch[i:i + self.sequence_length,...], action_batch[i:i + self.sequence_length, ...]))
+                x_seq[actual_size, ...] = s_and_a[np.newaxis,...]
+                y_seq[actual_size, ...] = np.expand_dims(next_state_batch[i + self.sequence_length,...], axis=0)
                 actual_size += 1
-        x_seq = np.resize(x_seq, (actual_size, self.sequence_length, self.state_size + self.action_size))
-        y_seq = np.resize(y_seq, (actual_size, self.state_size))
-        return x_seq_states, x_seq_actions, y_seq
+        x_seq = np.resize(x_seq, (actual_size, self.sequence_length, 2*self.n))
+        y_seq = np.resize(y_seq, (actual_size, self.n))
+        return x_seq, y_seq
 
 
     def run(self, environment, rounds=1):
@@ -250,7 +280,7 @@ if __name__ == "__main__":
         # x = env.step([np.array([0,0,1,0,0]),np.array([0,0,1,0,0]),np.array([1,0,0,0,0])])
         # print(x)
 
-        canary = ModelLearner(env)
+        canary = ModelLearner(env, sequence_length=1)
         canary.run(env, rounds=8)
 
-        print('MSE: {}'.format(canary.evaluate(env)))
+        #print('MSE: {}'.format(canary.evaluate(env)))
