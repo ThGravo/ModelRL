@@ -138,8 +138,6 @@ class ModelLearner:
             model.add(Dense(1000,
                             activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
-        if self.partial_obs_rate > 0:
-            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         # model.summary()
         return model
@@ -152,19 +150,17 @@ class ModelLearner:
                                          lr=.001):
         num_hlayers = len(dim_multipliers)
         model = Sequential()
-        model.add(LSTM(self.state_size * dim_multipliers[0],
+        model.add(LSTM(1000,
                        input_shape=(None, input_dim),
                        activation=activations[0],
                        return_sequences=num_hlayers is not 1
                        ))
         for i in range(num_hlayers - 1):
-            model.add(LSTM(self.state_size * dim_multipliers[i + 1],
+            model.add(LSTM(1000,
                            activation=activations[min(i + 1, len(activations) - 1)],
                            return_sequences=i is not num_hlayers - 2))
             # stacked LSTMs need to return a sequence
         model.add(Dense(output_dim, activation='relu'))
-        if self.partial_obs_rate > 0:
-            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         # model.summary()
         return model
@@ -324,11 +320,12 @@ if __name__ == "__main__":
     for env_name in ['BipedalWalker-v2']:
         env = gym.make(env_name)
         print(env.observation_space)
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.0, sequence_length=1)
+        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.2, sequence_length=5)
         #canary.refill_mem(env)
         print("loading memory")
-        canary.memory = np.load('/home/aocc/code/DL/MDP_learning/save_memory/first_20mill/BipedalWalker-v2FULL.npy')
+        canary.memory = np.load('/home/aocc/code/DL/MDP_learning/save_memory/BipedalWalker-v2IMPUTED0.2round0.npy')
         print(canary.memory.shape)
+        #t_x, t_y = canary.setup_batch_for_RNN(canary.memory)
         t_x = canary.memory[:, :canary.state_size + canary.action_size]
         t_y = canary.memory[:, -canary.state_size - 1:-1] - canary.memory[:, :canary.state_size]
         canary.tmodel.fit(t_x, t_y,
@@ -338,4 +335,4 @@ if __name__ == "__main__":
                         callbacks=canary.Ttensorboard, verbose=1)
         #canary.run(env, rounds=1)
 
-        print('MSE: {}'.format(canary.evaluate(env)))
+       
