@@ -1,4 +1,4 @@
-from MDP_learning.helpers import make_env
+from MDP_learning.multi_agent import make_env
 import numpy as np
 
 env_name = 'simple_spread'

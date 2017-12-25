@@ -1,4 +1,4 @@
-from MDP_learning.helpers import make_env
+from MDP_learning.multi_agent import make_env
 
 from collections import deque
 from keras.layers import Dense, LSTM

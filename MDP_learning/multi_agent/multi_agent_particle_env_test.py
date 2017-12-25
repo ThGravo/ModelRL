@@ -1,11 +1,12 @@
 from multiagent.environment import MultiAgentEnv
 from multiagent.policy import InteractivePolicy
 import multiagent.scenarios as scenarios
+import MDP_learning.multi_agent.policies as MAPolicies
 
 scenario_name = 'simple_spread'
 
 # load scenario from script
-scenario = scenarios.load(scenario_name).Scenario()
+scenario = scenarios.load(scenario_name + ".py").Scenario()
 # create world
 world = scenario.make_world()
 # create multiagent environment
@@ -18,7 +19,17 @@ env = MultiAgentEnv(world, reset_callback=scenario.reset_world,
 # render call to create viewer window (necessary only for interactive policies)
 env.render()
 # create interactive policies for each agent
-policies = [InteractivePolicy(env, i) for i in range(env.n)]
+# policies = [InteractivePolicy(env, i) for i in range(env.n)]
+policies = [MAPolicies.RandomPolicy(env, i) for i in range(env.n)]
+
+# print infos
+print("action_space: ")
+print(env.action_space)
+print("discrete_action_space: ")
+print(env.discrete_action_space)
+print("discrete_action_input: ")
+print(env.discrete_action_input)
+
 # execution loop
 obs_n = env.reset()
 while True:
