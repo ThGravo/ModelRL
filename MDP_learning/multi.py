@@ -1,16 +1,11 @@
-from MDP_learning import make_env
-
-import tensorflow as tf
+from MDP_learning.helpers import make_env
 
 from collections import deque
 from keras.layers import Dense, LSTM
 from keras.optimizers import Adam
 from keras.models import Sequential
-from keras.callbacks import TensorBoard
-import gym
 import random
 import numpy as np
-import matplotlib
 # matplotlib.use('GTK3Cairo', warn=False, force=True)
 import matplotlib.pyplot as plt
 
