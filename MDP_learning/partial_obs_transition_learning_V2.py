@@ -24,7 +24,7 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=75000, epochs=4000, learning_rate=.001,
+    def __init__(self, observation_space, action_space, data_size=500000, epochs=4, learning_rate=.001,
                  tmodel_dim_multipliers=(1, 1), tmodel_activations=('relu', 'relu'), sequence_length=1,
                  partial_obs_rate=0.0):
 
@@ -185,8 +185,8 @@ class ModelLearner:
     def train_models(self, minibatch_size=512):
         #file = "memoryV2.npy"
         #np.save(file, np.array(self.memory))
-        memory_arr = np.array(random.sample(list(np.array(self.memory)),100000))
-
+        #memory_arr = np.array(random.sample(list(np.array(self.memory)),100000))
+        memory_arr = np.array(self.memory)
         if self.partial_obs_rate > 0:
             self.make_mem_partial_obs(memory_arr)
             file1 = "memoryBWcorrupted.npy"
@@ -317,22 +317,22 @@ def weighted_mean_squared_error(y_true, y_pred):
 
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['BipedalWalker-v2']:
+    for env_name in ['Swimmer-v1']:
         env = gym.make(env_name)
         print(env.observation_space)
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.2, sequence_length=5)
+        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.0, sequence_length=1)
         #canary.refill_mem(env)
-        print("loading memory")
-        canary.memory = np.load('/home/aocc/code/DL/MDP_learning/save_memory/BipedalWalker-v2IMPUTED0.2round0.npy')
-        print(canary.memory.shape)
+        #print("loading memory")
+        #canary.memory = np.load('/home/aocc/code/DL/MDP_learning/save_memory/BipedalWalker-v2IMPUTED0.2round0.npy')
+        #print(canary.memory.shape)
         #t_x, t_y = canary.setup_batch_for_RNN(canary.memory)
-        t_x = canary.memory[:, :canary.state_size + canary.action_size]
-        t_y = canary.memory[:, -canary.state_size - 1:-1] - canary.memory[:, :canary.state_size]
-        canary.tmodel.fit(t_x, t_y,
-                        batch_size=512,
-                        epochs=canary.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=canary.Ttensorboard, verbose=1)
-        #canary.run(env, rounds=1)
+        #t_x = canary.memory[:, :canary.state_size + canary.action_size]
+        #t_y = canary.memory[:, -canary.state_size - 1:-1] - canary.memory[:, :canary.state_size]
+        #canary.tmodel.fit(t_x, t_y,
+        #                batch_size=512,
+        #                epochs=canary.net_train_epochs,
+        #                validation_split=0.1,
+        #                callbacks=canary.Ttensorboard, verbose=1)
+        canary.run(env, rounds=4)
 
        
