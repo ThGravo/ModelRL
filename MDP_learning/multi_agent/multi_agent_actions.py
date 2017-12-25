@@ -1,6 +1,5 @@
-from MDP_learning import make_env
+from MDP_learning.multi_agent import make_env
 import numpy as np
-import random
 
 env_name = 'simple_spread'
 env = make_env.make_env(env_name)
