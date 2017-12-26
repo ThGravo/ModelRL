@@ -1,21 +1,9 @@
-from multiagent.environment import MultiAgentEnv
-from multiagent.policy import InteractivePolicy
-import multiagent.scenarios as scenarios
 import MDP_learning.multi_agent.policies as MAPolicies
+import MDP_learning.multi_agent.make_env2 as make_env
 
-scenario_name = 'simple_spread'
+scenario_name = 'simple_world_comm'
+env = make_env.make_env(scenario_name)
 
-# load scenario from script
-scenario = scenarios.load(scenario_name + ".py").Scenario()
-# create world
-world = scenario.make_world()
-# create multiagent environment
-env = MultiAgentEnv(world, reset_callback=scenario.reset_world,
-                    reward_callback=scenario.reward,
-                    observation_callback=scenario.observation,
-                    info_callback=None,
-                    done_callback=None,
-                    shared_viewer=False)
 # render call to create viewer window (necessary only for interactive policies)
 env.render()
 # create interactive policies for each agent

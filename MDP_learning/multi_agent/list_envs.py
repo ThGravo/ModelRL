@@ -1,6 +1,6 @@
 from multiagent.environment import MultiAgentEnv
 import multiagent.scenarios as scenarios
-from MDP_learning.multi_agent import make_env
+from MDP_learning.multi_agent import make_env2
 
 '''
 | Env name in code (name in paper) |  Communication? | Competitive? | Notes |
@@ -25,8 +25,10 @@ envall = ['simple', 'simple_adversary', 'simple_crypto', 'simple_push', 'simple_
 for e in envall:
     env = make_env.make_env(e)
     agent_action_range = []
+    agent_action_size = []
     for i, a in enumerate(env.agents):
         agent_action_range.append("{}:{}".format(i, a.u_range))
+        #agent_action_size.append("{}:{}".format(i, a.))
     table += '| {}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n'.format(e,  # |{}|{}|{}|{}
                                                         env.observation_space, env.action_space, env.reward_range,
                                                         env.n, len(env.world.landmarks), env.world.dim_c,
