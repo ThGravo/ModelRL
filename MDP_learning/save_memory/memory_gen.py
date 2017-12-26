@@ -321,9 +321,9 @@ def weighted_mean_squared_error(y_true, y_pred):
 
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['BipedalWalker-v2', 'LunarLander-v2', 'Ant-v1']:
+    for env_name in ['Swimmer-v1', 'Hopper-v1']:
         print(env_name)
-        for round in range(10):
+        for round in range(2):
             print(round)
             env = gym.make(env_name)
             canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.0, sequence_length=1)
