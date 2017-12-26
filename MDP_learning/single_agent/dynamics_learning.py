@@ -1,25 +1,14 @@
-import tensorflow as tf
 from collections import deque
-from keras.layers import Dense, LSTM, GRU
-from keras.optimizers import Adam
-from keras.models import Sequential
-import keras as K
 from keras.callbacks import TensorBoard
 import gym
-import random
 import numpy as np
-import pandas as pd
-import matplotlib
-# matplotlib.use('GTK3Cairo', warn=False, force=True)
-from collections import namedtuple
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import Imputer, MinMaxScaler
 from fancyimpute import KNN, SimpleFill, SoftImpute, MICE, IterativeSVD, NuclearNormMinimization, MatrixFactorization, BiScaler
 from MDP_learning.single_agent.preprocessing import standardise_memory, make_mem_partial_obs, setup_batch_for_RNN, impute_missing
 from MDP_learning.single_agent.networks import build_regression_model, build_recurrent_regression_model, build_dmodel
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=5000000, epochs=100, learning_rate=.001,
+    def __init__(self, observation_space, action_space, data_size=5000, epochs=100, learning_rate=.001,
                  tmodel_dim_multipliers=(1, 1), tmodel_activations=('relu', 'relu'), sequence_length=1,
                  partial_obs_rate=0.0):
 
