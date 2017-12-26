@@ -27,44 +27,33 @@ class RandomPolicy(multiagent.policy.Policy):
         # self.discrete_action_input = False
         # if true, even the action is continuous, action will be performed discretely
         action_space = self.env.action_space[self.agent_index]
-        smpl = action_space.sample()
 
         size_act = 0
-        size_com = 0
+        size_com = self.env.world.dim_c
         if isinstance(action_space, spaces.MultiDiscrete):
             size = action_space.high - action_space.low + 1
             size_act = size[0]
-            size_com = self.env.world.dim_c
         elif isinstance(action_space, spaces.Discrete):
             size_act = action_space.n if agent.movable else 0
-            size_com = 0 if agent.silent else self.env.world.dim_c
+        elif isinstance(action_space, spaces.Box):
+            size_act = sum(action_space.shape)
+        elif isinstance(action_space, spaces.Tuple):
+            raise NotImplementedError()
+        else:
+            raise NotImplementedError()
 
         u = np.array([])
         if agent.movable:
             # physical action
             if self.env.discrete_action_input:
                 u = np.random.randint(size_act)
-                '''
-                u = np.zeros(self.env.world.dim_p)
-                # process discrete action
-                if action[0] == 1: agent.action.u[0] = -1.0
-                if action[0] == 2: agent.action.u[0] = +1.0
-                if action[0] == 3: agent.action.u[1] = -1.0
-                if action[0] == 4: agent.action.u[1] = +1.0
-                '''
             else:
-                '''if self.env.force_discrete_action:
-                    d = np.argmax(action[0])
-                    action[0][:] = 0.0
-                    action[0][d] = 1.0'''
                 if self.env.discrete_action_space:
-                    '''u[0] += action[0][1] - action[0][2]
-                    u[1] += action[0][3] - action[0][4]'''
                     # one-hot encoded
                     u = np.zeros(size_act)
                     u[np.random.randint(size_act)] = 1.0
                 else:
-                    u = np.random.uniform(low=action_space.low, high=action_space.high, size=action_space.shape)
+                    u = np.random.uniform(low=action_space.low, high=action_space.high, size=size_act)
 
         c = np.array([])
         if not agent.silent:
@@ -77,44 +66,4 @@ class RandomPolicy(multiagent.policy.Policy):
                 '''c = action[0]'''
                 c = np.random.uniform(low=0.0, high=1.0, size=size_com)
 
-        return np.concatenate([u,c])
-
-
-        if self.env.discrete_action_input:
-            return smpl
-        else:
-            u = np.zeros(self.env.world.dim_p * 2 + 1)
-            if self.env.discrete_action_space:
-                u = np.zeros(self.env.world.dim_p * 2 + 1)
-                #u = np.random.uniform(low=action_space.low, high=action_space.high, size=action_space.shape)
-                u[smpl[0]] = 1.0
-            else:
-                u = np.zeros(self.env.world.dim_p)
-                u[smpl[0]] = 1.0
-            return np.concatenate([u, np.zeros(self.env.world.dim_c)])
-
-        if isinstance(action_space, spaces.Discrete):
-            s = discrete_space_sample(action_space.n)
-        if isinstance(action_space, spaces.Box):
-            s = np.random.uniform(low=action_space.low, high=action_space.high, size=action_space.shape)
-
-        if isinstance(action_space, spaces.MultiDiscrete):
-            s = action_space.sample()
-        if isinstance(action_space, spaces.Tuple):
-            s = action_space.sample()
-
-        if self.env.discrete_action_input:
-            u = np.random.randint(action_space.n)
-        else:
-            u = np.zeros(5)  # one-hot-encoded TODO hard-coded 5
-            if self.env.discrete_action_space:
-                act = np.random.uniform(low=0, high=1)
-            else:
-                act = np.random.uniform(low=action_space.low, high=action_space.high)
-            u[np.random.randint(action_space.n)] = act
-
-        if agent.movable:
-            if agent.silent:
-                return u
-            else:
-                return np.concatenate([u, np.zeros(self.env.world.dim_c)])
+        return np.concatenate([u, c])
