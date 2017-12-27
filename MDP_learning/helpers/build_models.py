@@ -52,3 +52,5 @@ def build_dmodel(input_dim,
     model.compile(loss='binary_crossentropy', optimizer=Adam(lr=lr), metrics=['accuracy'])
     # model.summary()
     return model
+
+

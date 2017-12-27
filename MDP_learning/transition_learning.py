@@ -40,7 +40,6 @@ class ModelLearner:
         self.memory = deque(maxlen=self.data_size)
         self.recurrent = recurrent
 
-
         self.tmodel = self.build_regression_model(self.state_size + self.action_size, self.state_size, lr=learning_rate,
                                                   dim_multipliers=tmodel_dim_multipliers,
                                                   activations=tmodel_activations)
@@ -63,7 +62,7 @@ class ModelLearner:
                                lr=.001):
         model = Sequential()
         if self.recurrent:
-            model.add(LSTM(64,input_dim=1))
+            model.add(LSTM(64, input_dim=1))
             model.add(Dense(output_dim, activation='linear'))
             model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         else:
@@ -75,7 +74,6 @@ class ModelLearner:
             model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
         model.summary()
         return model
-
 
     # approximate Done value
     # state is input and reward is output
