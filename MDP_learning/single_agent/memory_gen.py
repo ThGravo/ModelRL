@@ -13,7 +13,7 @@ for env_name in ['Swimmer-v1', 'Hopper-v1']:
     print("Saving memory")
     np.save('/home/aocc/code/DL/MDP_learning/save_memory/' + str(env_name) + 'FULL',
             memory_arr)
-    for rate in [0.05, 0.1]:
+    for rate in [0.1, 0.05, 0.1]:
         make_mem_partial_obs(memory_arr,canary.state_size,rate)
         print("Saving corrupted memory")
         np.save(
