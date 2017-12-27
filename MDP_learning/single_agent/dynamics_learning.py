@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from fancyimpute import KNN, SimpleFill, SoftImpute, MICE, IterativeSVD, NuclearNormMinimization, MatrixFactorization, BiScaler
 from MDP_learning.single_agent.preprocessing import standardise_memory, make_mem_partial_obs, setup_batch_for_RNN, impute_missing
 from MDP_learning.single_agent.networks import build_regression_model, build_recurrent_regression_model, build_dmodel
+from time import time
 
 class ModelLearner:
     def __init__(self, observation_space, action_space, data_size=5000, epochs=100, learning_rate=.001,
@@ -50,7 +51,7 @@ class ModelLearner:
                                                   activations=('sigmoid', 'sigmoid'))
         self.dmodel = build_dmodel(self.state_size)
 
-        self.Ttensorboard = []  # [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
+        self.Ttensorboard = [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
         self.Rtensorboard = []  # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
         self.Dtensorboard = []  # [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
 
