@@ -194,5 +194,5 @@ if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
     for env_name in ['LunarLander-v2']:
         env = gym.make(env_name)
-        canary = ModelLearner(env, partial_obs_rate=0.0, sequence_length=1)
+        canary = ModelLearner(env, partial_obs_rate=0.0, sequence_length=0)
         canary.run(env, rounds=1)
