@@ -3,13 +3,35 @@ import multiagent.policy
 from gym import spaces
 
 
-def discrete_space_sample(n):
-    a = np.zeros(n)
-    i = np.random.randint(n + 1)
-    # no action is also possible
-    if i < n:
-        a[i] = 1
-    return a
+def get_action_and_comm_size(action_space, agent):
+    size_act = 0
+    size_com = 0
+    if isinstance(action_space, spaces.MultiDiscrete):
+        size = action_space.high - action_space.low + 1
+        size_act = size[0] if agent.movable else 0
+        size_com = size[1] if not agent.silent else 0
+    elif isinstance(action_space, spaces.Discrete):
+        size_act = action_space.n if agent.movable else 0
+        size_com = action_space.n if not agent.silent else 0
+    elif isinstance(action_space, spaces.Box):
+        size_act = sum(action_space.shape) if agent.movable else 0
+        size_com = sum(action_space.shape) if not agent.silent else 0
+    elif isinstance(action_space, spaces.Tuple):
+        assert len(action_space.spaces) == 2
+        # TODO duplicate from above - reduce code duplication
+        if isinstance(action_space.spaces[0], spaces.Discrete):
+            size_act = action_space.spaces[0].n if agent.movable else 0
+        elif isinstance(action_space.spaces[0], spaces.Box):
+            size_act = sum(action_space.spaces[0].shape) if agent.movable else 0
+
+        if isinstance(action_space.spaces[1], spaces.Discrete):
+            size_com = action_space.spaces[1].n if not agent.silent else 0
+        elif isinstance(action_space.spaces[1], spaces.Box):
+            size_com = sum(action_space.spaces[1].shape) if not agent.silent else 0
+        assert False  # not sure if that's correct - as there is no example of it
+    else:
+        raise NotImplementedError()
+    return size_act, size_com
 
 
 # no communication
@@ -28,19 +50,7 @@ class RandomPolicy(multiagent.policy.Policy):
         # if true, even the action is continuous, action will be performed discretely
         action_space = self.env.action_space[self.agent_index]
 
-        size_act = 0
-        size_com = self.env.world.dim_c
-        if isinstance(action_space, spaces.MultiDiscrete):
-            size = action_space.high - action_space.low + 1
-            size_act = size[0]
-        elif isinstance(action_space, spaces.Discrete):
-            size_act = action_space.n if agent.movable else 0
-        elif isinstance(action_space, spaces.Box):
-            size_act = sum(action_space.shape)
-        elif isinstance(action_space, spaces.Tuple):
-            raise NotImplementedError()
-        else:
-            raise NotImplementedError()
+        size_act, size_com = get_action_and_comm_size(action_space, agent)
 
         u = np.array([])
         if agent.movable:
