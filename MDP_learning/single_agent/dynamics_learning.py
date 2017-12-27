@@ -3,15 +3,24 @@ from keras.callbacks import TensorBoard
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
-from fancyimpute import KNN, SimpleFill, SoftImpute, MICE, IterativeSVD, NuclearNormMinimization, MatrixFactorization, BiScaler
-from MDP_learning.single_agent.preprocessing import standardise_memory, make_mem_partial_obs, setup_batch_for_RNN, impute_missing
+from fancyimpute import KNN, SimpleFill, SoftImpute, MICE, IterativeSVD, NuclearNormMinimization, MatrixFactorization, \
+    BiScaler
+from MDP_learning.single_agent.preprocessing import standardise_memory, make_mem_partial_obs, setup_batch_for_RNN, \
+    impute_missing
 from MDP_learning.single_agent.networks import build_regression_model, build_recurrent_regression_model, build_dmodel
 from time import time
 
-class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=5000, epochs=100, learning_rate=.001,
+from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
+
+
+class ModelLearner(LoggingModelLearner):
+    def __init__(self, environment, data_size=5000, epochs=100, learning_rate=.001,
                  tmodel_dim_multipliers=(1, 1), tmodel_activations=('relu', 'relu'), sequence_length=1,
                  partial_obs_rate=0.0):
+        super().__init__(environment, sequence_length, out_dir_add='po_rate{}'.format(partial_obs_rate))
+
+        observation_space = environment.observation_space
+        action_space = environment.action_space
 
         # get size of state and action from environment
         self.state_size = sum(observation_space.shape)
@@ -27,8 +36,6 @@ class ModelLearner:
         # These are hyper parameters
         self.learning_rate = learning_rate
         self.net_train_epochs = epochs
-        self.useRNN = sequence_length > 1
-        self.sequence_length = sequence_length
         self.partial_obs_rate = partial_obs_rate
 
         # create replay memory using deque
@@ -37,23 +44,23 @@ class ModelLearner:
 
         if self.useRNN:
             self.tmodel = build_recurrent_regression_model(self.state_size + self.action_size, self.state_size,
-                                                                lr=learning_rate,
-                                                                dim_multipliers=tmodel_dim_multipliers,
-                                                                activations=tmodel_activations)
+                                                           lr=learning_rate,
+                                                           dim_multipliers=tmodel_dim_multipliers,
+                                                           activations=tmodel_activations)
             self.seq_mem = deque(maxlen=self.sequence_length)
         else:
             self.tmodel = build_regression_model(self.state_size + self.action_size, self.state_size,
-                                                      lr=learning_rate,
-                                                      dim_multipliers=tmodel_dim_multipliers,
-                                                      activations=tmodel_activations)
+                                                 lr=learning_rate,
+                                                 dim_multipliers=tmodel_dim_multipliers,
+                                                 activations=tmodel_activations)
         self.rmodel = build_regression_model(self.state_size, 1, lr=learning_rate,
-                                                  dim_multipliers=(4, 4),
-                                                  activations=('sigmoid', 'sigmoid'))
+                                             dim_multipliers=(4, 4),
+                                             activations=('sigmoid', 'sigmoid'))
         self.dmodel = build_dmodel(self.state_size)
 
-        self.Ttensorboard = [TensorBoard(log_dir='./logs/Tlearn/{}'.format(time()))]
-        self.Rtensorboard = []  # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
-        self.Dtensorboard = []  # [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
+        # logging config of the network
+        self.models = [self.tmodel, self.rmodel, self.dmodel]
+        self.save_model_config()
 
     # get action from model using random policy
     def get_action(self, state, environment):
@@ -75,7 +82,7 @@ class ModelLearner:
         # memory_arr = np.array(random.sample(list(np.array(self.memory)),100000))
         memory_arr = np.array(self.memory)
         if self.partial_obs_rate > 0:
-            make_mem_partial_obs(memory_arr,self.state_size,self.partial_obs_rate)
+            make_mem_partial_obs(memory_arr, self.state_size, self.partial_obs_rate)
             print("Memory size:")
             print(memory_arr.size)
             print("Proportion of missing values:")
@@ -87,7 +94,7 @@ class ModelLearner:
         minibatch_size = min(minibatch_size, batch_size)
 
         if self.useRNN:
-            t_x, t_y = setup_batch_for_RNN(memory_arr,self.sequence_length,self.state_size,self.action_size)
+            t_x, t_y = setup_batch_for_RNN(memory_arr, self.sequence_length, self.state_size, self.action_size)
         else:
             t_x = memory_arr[:, :self.state_size + self.action_size]
             t_y = memory_arr[:, -self.state_size - 1:-1] - memory_arr[:, :self.state_size]
@@ -113,6 +120,7 @@ class ModelLearner:
                         validation_split=0.1,
                         callbacks=self.Dtensorboard, verbose=0)
         '''
+
     def step(self, state, action):
         batch_size = 1
         state = np.reshape(state, [1, self.state_size])
@@ -184,7 +192,7 @@ class ModelLearner:
 
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['Swimmer-v1', 'Hopper-v1']:
+    for env_name in ['LunarLander-v2']:
         env = gym.make(env_name)
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.0, sequence_length=1)
+        canary = ModelLearner(env, partial_obs_rate=0.0, sequence_length=1)
         canary.run(env, rounds=1)
