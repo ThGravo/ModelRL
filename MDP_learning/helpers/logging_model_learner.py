@@ -21,7 +21,7 @@ class LoggingModelLearner(object):
 
         self.out_dir = './out/{}/{}_{}_seqlen{}{}'.format(
             base_name,
-            self.env.spec.id,
+            self.env.spec.id if self.env.spec is not None else str(self.env),
             strftime("%y-%m-%d_%H:%M", gmtime()),
             self.sequence_length,
             '__{}'.format(out_dir_add) if out_dir_add is not None else ''
@@ -44,13 +44,12 @@ class LoggingModelLearner(object):
         self.models = []
         for i in range(n_models):
             self.models.append(deserialize_model("{}/model{}".format(self.out_dir, i)))
-        if n_models is 3:  # TODO ugly!
-            if hasattr(self, 'tmodel'):
-                self.tmodel = self.models[0]
-            if hasattr(self, 'rmodel'):
-                self.rmodel = self.models[1]
-            if hasattr(self, 'dmodel'):
-                self.dmodel = self.models[2]
+        if hasattr(self, 'tmodel'):
+            self.tmodel = self.models[0]
+        if hasattr(self, 'rmodel'):
+            self.rmodel = self.models[1]
+        if hasattr(self, 'dmodel'):
+            self.dmodel = self.models[2]
 
 
 def serialize_model(model, folder, filename='model'):
