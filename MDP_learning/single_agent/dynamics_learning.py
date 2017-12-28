@@ -14,7 +14,7 @@ from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
 
 
 class ModelLearner(LoggingModelLearner):
-    def __init__(self, environment, data_size=5000, epochs=100, learning_rate=.001,
+    def __init__(self, environment, data_size=5000, epochs=1000, learning_rate=.001,
                  tmodel_dim_multipliers=(1, 1), tmodel_activations=('relu', 'relu'), sequence_length=1,
                  partial_obs_rate=0.0):
         super().__init__(environment, sequence_length, out_dir_add='po_rate{}'.format(partial_obs_rate))
@@ -81,6 +81,7 @@ class ModelLearner(LoggingModelLearner):
     def train_models(self, minibatch_size=512):
         # memory_arr = np.array(random.sample(list(np.array(self.memory)),100000))
         memory_arr = np.array(self.memory)
+        '''
         if self.partial_obs_rate > 0:
             make_mem_partial_obs(memory_arr, self.state_size, self.partial_obs_rate)
             print("Memory size:")
@@ -89,7 +90,8 @@ class ModelLearner(LoggingModelLearner):
             print(np.isnan(memory_arr).sum() / memory_arr.size)
             impute_missing(memory_arr, self.state_size, MICE)
         else:
-            standardise_memory(memory_arr, self.state_size, self.action_size)
+        '''
+        # standardise_memory(memory_arr, self.state_size, self.action_size)
         batch_size = len(memory_arr)
         minibatch_size = min(minibatch_size, batch_size)
 
@@ -192,7 +194,10 @@ class ModelLearner(LoggingModelLearner):
 
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['LunarLander-v2']:
+    for env_name in ['Swimmer-v1']:
         env = gym.make(env_name)
-        canary = ModelLearner(env, partial_obs_rate=0.0, sequence_length=0)
-        canary.run(env, rounds=1)
+        canary = ModelLearner(env, partial_obs_rate=0.1, sequence_length=5)
+        mem = np.load('/home/aocc/code/DL/MDP_learning/save_memory/Swimmer-v1IMPUTED0.1round<built-in function round>.npy')
+        canary.memory = mem
+        canary.train_models()
+        #canary.run(env, rounds=1)
