@@ -3,7 +3,31 @@ import multiagent.policy
 from gym import spaces
 
 
-def get_action_and_comm_size(action_space, agent):
+def get_action_and_comm_actual_size(env, agent_index):
+    agent = env.agents[agent_index]
+    size_act = 0
+    size_com = 0
+    if agent.movable:
+        # physical action
+        if env.discrete_action_input:
+            size_act = env.world.dim_p
+        else:
+            if env.discrete_action_space:
+                size_act = env.world.dim_p
+            else:
+                size_act = 1
+
+    if not agent.silent:
+        # communication action
+        if env.discrete_action_input:
+            size_com = env.world.dim_c
+        else:
+            size_com = 1
+
+    return size_act, size_com
+
+
+def get_action_and_comm_input_size(action_space, agent):
     size_act = 0
     size_com = 0
     if isinstance(action_space, spaces.MultiDiscrete):
@@ -49,7 +73,7 @@ class RandomPolicy(multiagent.policy.Policy):
         # if true, even the action is continuous, action will be performed discretely
         action_space = self.env.action_space[self.agent_index]
 
-        size_act, size_com = get_action_and_comm_size(action_space, agent)
+        size_act, size_com = get_action_and_comm_input_size(action_space, agent)
 
         u = np.array([])
         if agent.movable:
