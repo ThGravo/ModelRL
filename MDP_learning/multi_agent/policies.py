@@ -18,7 +18,6 @@ def get_action_and_comm_size(action_space, agent):
         size_com = sum(action_space.shape) if not agent.silent else 0
     elif isinstance(action_space, spaces.Tuple):
         assert len(action_space.spaces) == 2
-        # TODO duplicate from above - reduce code duplication
         if isinstance(action_space.spaces[0], spaces.Discrete):
             size_act = action_space.spaces[0].n if agent.movable else 0
         elif isinstance(action_space.spaces[0], spaces.Box):
