@@ -20,7 +20,7 @@ class ModelLearner(LoggingModelLearner):
         from collections import namedtuple
         Spec = namedtuple('Spec', 'id')
         Myenv = namedtuple('Myenv', ['spec'])
-        t = Myenv(Spec(env_name)) # HACK to get the name injected there
+        t = Myenv(Spec(env_name))  # HACK to get the name injected there
         super().__init__(t, sequence_length, out_dir_add='po_rate{}'.format(partial_obs_rate))
 
         # get size of state and action from environment
@@ -192,29 +192,31 @@ class ModelLearner(LoggingModelLearner):
         mse = ((p - r) ** 2).mean()
         return mse
 
-import pickle
+
 if __name__ == "__main__":
     # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['Swimmer-v1']:
-        specs = gym.spec(env_name)
-        env = gym.make(env_name)
+    import pickle
 
-        if True: # then save
+    # either just pickle
+    if False:  # then save
+        for env_name in ['Swimmer-v1', 'BipedalWalker-v2', 'Ant-v1', 'LunarLander-v2', 'Hopper-v1']:
+            env = gym.make(env_name)
             observation_space = env.observation_space
             action_space = env.action_space
             with open('{}_observation_space.pickle'.format(env_name), 'wb') as f:
                 pickle.dump(observation_space, f)
             with open('{}_action_space.pickle'.format(env_name), 'wb') as f:
                 pickle.dump(action_space, f)
-        else: # load
-            with open('{}_observation_space.pickle'.format(env_name), 'rb') as f:
-                observation_space = pickle.load(f)
-            with open('{}_action_space.pickle'.format(env_name), 'rb') as f:
-                action_space = pickle.load(f)
+
+    else:
+        # or load pickle and run a training
+        env_name = "Swimmer-v1"
+        with open('{}_observation_space.pickle'.format(env_name), 'rb') as f:
+            observation_space = pickle.load(f)
+        with open('{}_action_space.pickle'.format(env_name), 'rb') as f:
+            action_space = pickle.load(f)
 
         canary = ModelLearner(env_name, observation_space, action_space, partial_obs_rate=0.1, sequence_length=5)
-        mem = np.load(
-            '/home/aocc/code/DL/MDP_learning/save_memory/Swimmer-v1IMPUTED0.1round<built-in function round>.npy')
+        mem = np.load('../save_memory/{}IMPUTED0.1round<built-in function round>.npy'.format(env_name))
         canary.memory = mem
         canary.train_models()
-        # canary.run(env, rounds=1)
