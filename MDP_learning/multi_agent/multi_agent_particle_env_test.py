@@ -35,3 +35,5 @@ for scenario_name in scenario_names:
         # display rewards
         for agent in env.world.agents:
             print(agent.name + " reward: %0.3f" % env._get_reward(agent))
+        if any(done_n):
+            print("DONE")
