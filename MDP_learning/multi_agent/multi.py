@@ -14,20 +14,20 @@ from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
 class ModelLearner(LoggingModelLearner):
     def __init__(self, environment, agent_id, action_size,
                  mem_size=3000, epochs=4, learning_rate=.001,
-                 sequence_length=0, write_tboard=True, env_name=None):
+                 sequence_length=0, write_tboard=True, envname=None):
         super().__init__(environment, sequence_length,
                          write_tboard=write_tboard,
                          out_dir_add=
                          'agentID{}{}'.format(
                              agent_id,
-                             '_scenario_{}'.format(env_name) if env_name is not None else ''))
+                             '_scenario_{}'.format(envname) if envname is not None else ''))
 
         self.learning_rate = learning_rate
         self.net_train_epochs = epochs
         self.mem_size = mem_size
 
         self.x_memory = deque(maxlen=mem_size)
-        self.y_memory = deque(maxlen=mem_size)
+        self.next_obs_memory = deque(maxlen=mem_size)
 
         self.agent_id = agent_id
         self.policy = MAPolicies.RandomPolicy(env, self.agent_id)
@@ -45,15 +45,15 @@ class ModelLearner(LoggingModelLearner):
     def append_to_mem(self, obs, act, reward, obs_next, done):
         # TODO is there any point in learning done in this environment
         self.x_memory.append(np.concatenate((obs, act)))
-        self.y_memory.append(np.concatenate(([reward], obs_next)))
+        self.next_obs_memory.append(np.concatenate(([reward], obs_next)))
 
     def clear_mem(self):
         self.x_memory.clear()
-        self.y_memory.clear()
+        self.next_obs_memory.clear()
 
     def train_models(self, minibatch_size=32):
         self.tmodel.fit(np.array(self.x_memory),
-                        np.array(self.y_memory),
+                        np.array(self.next_obs_memory),
                         batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
@@ -69,27 +69,30 @@ class MultiAgentModelLearner(LoggingModelLearner):
                          write_tboard=write_tboard,
                          out_dir_add='scenario_name{}'.format(scenario_name) if scenario_name is not None else None)
         self.render = True
-
+        self.joined_actions = False
+        self.gather_joined_mem = False
         self.mem_size = mem_size
-        self.x_memory = deque(maxlen=self.mem_size)
-        self.y_memory = deque(maxlen=self.mem_size)
+        self.x_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
+        self.y_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
 
         # if all actions are visible we need to sum them
-        action_compound_size = 0
-        for ii in range(self.env.n):
-            size_act, _ = MAPolicies.get_action_and_comm_actual_size(self.env, ii)
-            action_compound_size += size_act
+        if self.joined_actions:
+            action_compound_size = 0
+            for ii in range(self.env.n):
+                size_act, _ = MAPolicies.get_action_and_comm_actual_size(self.env, ii)
+                action_compound_size += size_act
 
         self.local_learners = []
-        for i in range(self.env.n):
+        for ii in range(self.env.n):
+            size_act, _ = MAPolicies.get_action_and_comm_actual_size(self.env, ii)
             self.local_learners.append(
-                ModelLearner(environment, i, action_compound_size,
+                ModelLearner(environment, ii, action_compound_size if self.joined_actions else size_act,
                              mem_size=mem_size,
                              epochs=epochs,
                              learning_rate=learning_rate,
                              sequence_length=sequence_length,
                              write_tboard=write_tboard,
-                             env_name=scenario_name))
+                             envname=scenario_name))
 
     # get action from model using random policy
     def get_action(self, obs_n):
@@ -124,24 +127,29 @@ class MultiAgentModelLearner(LoggingModelLearner):
             # TODO is there any point in learning done in this environment
             self.x_memory.append((np.array(obs_n).flatten(), np.array(act_n_real).flatten()))
             self.y_memory.append((np.array(reward_n).flatten(), np.array(obs_n_next).flatten()))
+
+            # hand them to the individual learners
             for jj, ll in enumerate(self.local_learners):
-                ll.append_to_mem(obs_n[jj], np.array(act_n_real).flatten(),  # LET ALL AGENTS SEE ALL ACTIONS
-                                 reward_n[jj], obs_n_next[jj], done_n[jj])
+                ll.append_to_mem(obs_n[jj],
+                                 np.array(act_n_real).flatten() if self.joined_actions else act_n_real[jj],
+                                 reward_n[jj],
+                                 obs_n_next[jj],
+                                 done_n[jj])
 
             obs_n = obs_n_next
 
-            # render and rest?
+            # render and reset?
             if self.render:
                 env.render()
-            if any(done_n):
+            if any(done_n):  # or random.randrange(123) == 0:  # do a random restart
+                obs_n = env.reset()
                 print("DONE")
-                break
 
     def setup_batch_for_RNN(self, batch):
         raise NotImplementedError
 
     # pick samples randomly from replay memory (with batch_size)
-    def train_model(self, minibatch_size=32):
+    def train_models(self, minibatch_size=32):
         for ii, ll in enumerate(self.local_learners):
             ll.train_models(minibatch_size=minibatch_size)
 
@@ -151,17 +159,17 @@ class MultiAgentModelLearner(LoggingModelLearner):
     def run(self, environment, rounds=1):
         for e in range(rounds):
             data = self.fill_memory()
-            self.train_model(data)
+            self.train_models(data)
 
     def evaluate(self, environment, do_plots=False):
         raise NotImplementedError
 
 
 if __name__ == "__main__":
-    env_name = 'simple_spread'
+    env_name = 'simple_push'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=128, sequence_length=0, scenario_name=env_name)
-    canary.run(env, rounds=100)
+    canary = MultiAgentModelLearner(env, mem_size=20000, sequence_length=0, scenario_name=env_name)
+    canary.run(env, rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
