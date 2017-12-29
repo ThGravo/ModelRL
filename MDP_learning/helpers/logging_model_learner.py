@@ -28,8 +28,8 @@ class LoggingModelLearner(object):
         )
 
         self.Ttensorboard = [TensorBoard(log_dir='{}/logs/Tlearn'.format(self.out_dir),
-                                         write_graph=False, write_grads=True, write_images=True,
-                                         histogram_freq=4)] if write_tboard else []
+                                         # write_graph=False,# write_grads=True, #write_images=True, histogram_freq=1
+                                         )] if write_tboard else []
         self.Rtensorboard = [TensorBoard(log_dir='{}/logs/Rlearn'.format(self.out_dir))] if write_tboard else []
         self.Dtensorboard = [TensorBoard(log_dir='{}/logs/Dlearn'.format(self.out_dir))] if write_tboard else []
 
