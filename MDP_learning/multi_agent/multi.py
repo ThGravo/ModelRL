@@ -28,13 +28,18 @@ class ModelLearner(LoggingModelLearner):
 
         self.x_memory = deque(maxlen=mem_size)
         self.next_obs_memory = deque(maxlen=mem_size)
+        self.reward_memory = deque(maxlen=mem_size)
 
         self.agent_id = agent_id
         self.policy = MAPolicies.RandomPolicy(env, self.agent_id)
 
         self.tmodel = build_models.build_regression_model(
-            self.env.observation_space[self.agent_id].shape[0] + action_size,
-            1 + self.env.observation_space[self.agent_id].shape[0])
+            input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
+            output_dim=self.env.observation_space[self.agent_id].shape[0])
+
+        self.rmodel = build_models.build_regression_model(
+            input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
+            output_dim=1)
 
         self.models = [self.tmodel]
         self.save_model_config()
@@ -45,7 +50,8 @@ class ModelLearner(LoggingModelLearner):
     def append_to_mem(self, obs, act, reward, obs_next, done):
         # TODO is there any point in learning done in this environment
         self.x_memory.append(np.concatenate((obs, act)))
-        self.next_obs_memory.append(np.concatenate(([reward], obs_next)))
+        self.next_obs_memory.append(obs_next)
+        self.reward_memory.append([reward])
 
     def clear_mem(self):
         self.x_memory.clear()
@@ -58,6 +64,13 @@ class ModelLearner(LoggingModelLearner):
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
                         callbacks=self.Ttensorboard,
+                        verbose=1)
+        self.rmodel.fit(np.array(self.x_memory),
+                        np.array(self.reward_memory),
+                        batch_size=minibatch_size,
+                        epochs=self.net_train_epochs,
+                        validation_split=0.1,
+                        callbacks=self.Rtensorboard,
                         verbose=1)
         self.save()
 
@@ -169,7 +182,7 @@ if __name__ == "__main__":
     env_name = 'simple_push'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=20000, sequence_length=0, scenario_name=env_name)
+    canary = MultiAgentModelLearner(env, mem_size=2000, sequence_length=0, scenario_name=env_name)
     canary.run(env, rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
