@@ -28,6 +28,7 @@ class ModelLearner(LoggingModelLearner):
 
         self.x_memory = deque(maxlen=mem_size)
         self.next_obs_memory = deque(maxlen=mem_size)
+        self.obs_memory = deque(maxlen=mem_size)
         self.reward_memory = deque(maxlen=mem_size)
 
         self.agent_id = agent_id
@@ -35,11 +36,13 @@ class ModelLearner(LoggingModelLearner):
 
         self.tmodel = build_models.build_regression_model(
             input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
-            output_dim=self.env.observation_space[self.agent_id].shape[0])
+            output_dim=self.env.observation_space[self.agent_id].shape[0],
+            recurrent=self.useRNN)
 
         self.rmodel = build_models.build_regression_model(
-            input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
-            output_dim=1)
+            input_dim=self.env.observation_space[self.agent_id].shape[0],
+            output_dim=1,
+            recurrent=self.useRNN)
 
         self.models = [self.tmodel]
         self.save_model_config()
@@ -51,13 +54,28 @@ class ModelLearner(LoggingModelLearner):
         # TODO is there any point in learning done in this environment
         self.x_memory.append(np.concatenate((obs, act)))
         self.next_obs_memory.append(obs_next)
-        self.reward_memory.append([reward])
+        self.obs_memory.append(obs)
+        self.reward_memory.append([reward * 1.0])
 
     def clear_mem(self):
         self.x_memory.clear()
         self.next_obs_memory.clear()
 
+    def setup_batch_for_RNN(self, batch):
+        array_size = batch.shape[0] - self.sequence_length
+        seq = np.empty((array_size, self.sequence_length, batch.shape[1]))
+        actual_size = 0
+        for jj in range(array_size):
+            # NO terminals here if not batch[jj:jj + self.sequence_length - 1, -1].any():
+            seq[actual_size, ...] = batch[np.newaxis,
+                                    jj:jj + self.sequence_length, :]
+            actual_size += 1
+
+        # no term seq = np.resize(seq, (actual_size, self.sequence_length, -1))
+        return seq
+
     def train_models(self, minibatch_size=32):
+        '''
         self.tmodel.fit(np.array(self.x_memory),
                         np.array(self.next_obs_memory),
                         batch_size=minibatch_size,
@@ -65,8 +83,12 @@ class ModelLearner(LoggingModelLearner):
                         validation_split=0.1,
                         callbacks=self.Ttensorboard,
                         verbose=1)
-        self.rmodel.fit(np.array(self.x_memory),
-                        np.array(self.reward_memory),
+        '''
+        input_data = self.setup_batch_for_RNN(np.array(self.obs_memory)) if self.useRNN else np.array(self.obs_memory)
+        train_signal = np.array(self.reward_memory)[self.sequence_length:, :] if self.useRNN else np.array(
+            self.reward_memory)
+        self.rmodel.fit(input_data,
+                        train_signal,
                         batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
@@ -89,8 +111,8 @@ class MultiAgentModelLearner(LoggingModelLearner):
         self.y_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
 
         # if all actions are visible we need to sum them
+        action_compound_size = 0
         if self.joined_actions:
-            action_compound_size = 0
             for ii in range(self.env.n):
                 size_act, _ = MAPolicies.get_action_and_comm_actual_size(self.env, ii)
                 action_compound_size += size_act
@@ -179,10 +201,10 @@ class MultiAgentModelLearner(LoggingModelLearner):
 
 
 if __name__ == "__main__":
-    env_name = 'simple_push'
+    env_name = 'simple'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=2000, sequence_length=0, scenario_name=env_name)
+    canary = MultiAgentModelLearner(env, mem_size=1000, sequence_length=5, scenario_name=env_name, epochs=10)
     canary.run(env, rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
