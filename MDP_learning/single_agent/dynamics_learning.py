@@ -14,8 +14,8 @@ from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
 
 
 class ModelLearner(LoggingModelLearner):
-    def __init__(self, env_name, observation_space, action_space, data_size=5000, epochs=1000, learning_rate=.001,
-                 tmodel_dim_multipliers=(1, 1), tmodel_activations=('relu', 'relu'), sequence_length=1,
+    def __init__(self, env_name, observation_space, action_space, data_size=20000000, epochs=1000, learning_rate=.001,
+                 tmodel_dim_multipliers=[1], tmodel_activations=('relu', 'relu'), sequence_length=0,
                  partial_obs_rate=0.0):
         from collections import namedtuple
         Spec = namedtuple('Spec', 'id')
@@ -106,7 +106,8 @@ class ModelLearner(LoggingModelLearner):
                         batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
-                        callbacks=self.Ttensorboard, verbose=1)
+                        #callbacks=self.Ttensorboard,
+                        verbose=1)
 
         '''
         self.rmodel.fit(batch[:, :self.state_size],
@@ -216,7 +217,8 @@ if __name__ == "__main__":
         with open('{}_action_space.pickle'.format(env_name), 'rb') as f:
             action_space = pickle.load(f)
 
-        canary = ModelLearner(env_name, observation_space, action_space, partial_obs_rate=0.1, sequence_length=5)
-        mem = np.load('../save_memory/{}IMPUTED0.1round<built-in function round>.npy'.format(env_name))
+        canary = ModelLearner(env_name, observation_space, action_space, partial_obs_rate=0.01, sequence_length=3)
+        mem = np.load('../save_memory/{}IMPUTED0.01round<built-in function round>.npy'.format(env_name))
+        print(mem.shape)
         canary.memory = mem
         canary.train_models()
