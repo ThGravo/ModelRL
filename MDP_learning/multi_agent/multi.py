@@ -1,12 +1,9 @@
 from MDP_learning.multi_agent import make_env2
 import MDP_learning.multi_agent.policies as MAPolicies
-
 from MDP_learning.helpers import build_models
 from collections import deque
 import random
 import numpy as np
-# matplotlib.use('GTK3Cairo', warn=False, force=True)
-import gym
 
 from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
 
@@ -42,7 +39,9 @@ class ModelLearner(LoggingModelLearner):
         self.rmodel = build_models.build_regression_model(
             input_dim=self.env.observation_space[self.agent_id].shape[0],
             output_dim=1,
-            recurrent=self.useRNN)
+            recurrent=self.useRNN,
+            dim_multipliers=(320, 160),
+            activations=('relu', 'relu'))
 
         self.models = [self.tmodel]
         self.save_model_config()
@@ -55,7 +54,8 @@ class ModelLearner(LoggingModelLearner):
         self.x_memory.append(np.concatenate((obs, act)))
         self.next_obs_memory.append(obs_next)
         self.obs_memory.append(obs)
-        self.reward_memory.append([reward * 1.0])
+        self.reward_memory.append([-np.sqrt(-reward)])
+        # self.reward_memory.append([1.0])
 
     def clear_mem(self):
         self.x_memory.clear()
@@ -75,26 +75,28 @@ class ModelLearner(LoggingModelLearner):
         return seq
 
     def train_models(self, minibatch_size=32):
-        '''
-        self.tmodel.fit(np.array(self.x_memory),
-                        np.array(self.next_obs_memory),
-                        batch_size=minibatch_size,
-                        epochs=self.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=self.Ttensorboard,
-                        verbose=1)
-        '''
-        input_data = self.setup_batch_for_RNN(np.array(self.obs_memory)) if self.useRNN else np.array(self.obs_memory)
-        train_signal = np.array(self.reward_memory)[self.sequence_length:, :] if self.useRNN else np.array(
-            self.reward_memory)
-        self.rmodel.fit(input_data,
-                        train_signal,
-                        batch_size=minibatch_size,
-                        epochs=self.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=self.Rtensorboard,
-                        verbose=1)
-        self.save()
+        if False:
+            input_data = self.setup_batch_for_RNN(np.array(self.x_memory)) if self.useRNN else np.array(self.x_memory)
+            self.tmodel.fit(input_data,
+                            np.array(self.next_obs_memory),
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Ttensorboard,
+                            verbose=1)
+        else:
+            input_data = self.setup_batch_for_RNN(np.array(self.obs_memory)) if self.useRNN else np.array(
+                self.obs_memory)
+            train_signal = np.array(self.reward_memory)[self.sequence_length:, :] if self.useRNN else np.array(
+                self.reward_memory)
+            self.rmodel.fit(input_data,
+                            train_signal,
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Rtensorboard,
+                            verbose=1)
+        # self.save()
 
 
 class MultiAgentModelLearner(LoggingModelLearner):
@@ -176,7 +178,7 @@ class MultiAgentModelLearner(LoggingModelLearner):
             # render and reset?
             if self.render:
                 env.render()
-            if any(done_n):  # or random.randrange(123) == 0:  # do a random restart
+            if any(done_n) or random.randrange(1234) == 0:  # do a random restart
                 obs_n = env.reset()
                 print("DONE")
 
@@ -191,10 +193,10 @@ class MultiAgentModelLearner(LoggingModelLearner):
     def step_model(self, state, action):
         raise NotImplementedError
 
-    def run(self, environment, rounds=1):
+    def run(self, rounds=1):
         for e in range(rounds):
-            data = self.fill_memory()
-            self.train_models(data)
+            self.fill_memory()
+            self.train_models()
 
     def evaluate(self, environment, do_plots=False):
         raise NotImplementedError
@@ -204,7 +206,7 @@ if __name__ == "__main__":
     env_name = 'simple'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=1000, sequence_length=5, scenario_name=env_name, epochs=10)
-    canary.run(env, rounds=1)
+    canary = MultiAgentModelLearner(env, mem_size=10000, sequence_length=0, scenario_name=env_name, epochs=10)
+    canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
