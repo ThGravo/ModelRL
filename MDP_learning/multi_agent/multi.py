@@ -29,6 +29,9 @@ class ModelLearner(LoggingModelLearner):
         self.reward_memory = deque(maxlen=mem_size)
         self.done_memory = deque(maxlen=mem_size)
 
+        self.vel_rew_memory = deque(maxlen=mem_size)
+        self.ent_pos_memory = deque(maxlen=mem_size)
+
         self.agent_id = agent_id
         self.policy = MAPolicies.RandomPolicy(env, self.agent_id)
 
@@ -46,8 +49,8 @@ class ModelLearner(LoggingModelLearner):
         )
         # used to predict the locations of a landmarks based on movement and reward sequence
         self.dmodel = build_models.build_regression_model(
-            input_dim=3,
-            output_dim=2,
+            input_dim=2 + 1,
+            output_dim=self.env.observation_space[self.agent_id].shape[0] - 2,
             recurrent=self.useRNN)
 
         self.models = [self.tmodel]
@@ -64,6 +67,9 @@ class ModelLearner(LoggingModelLearner):
         # self.reward_memory.append([-np.sqrt(-reward)])
         self.reward_memory.append([reward])
         self.done_memory.append([done])
+
+        self.vel_rew_memory.append(np.hstack((obs[:2], reward)))
+        self.ent_pos_memory.append(obs[2:])
 
     def clear_mem(self):
         self.x_memory.clear()
@@ -96,6 +102,7 @@ class ModelLearner(LoggingModelLearner):
             else:
                 input_data = np.array(self.x_memory)
                 train_signal = np.array(self.next_obs_memory)
+
             history = self.tmodel.fit(input_data,
                                       train_signal,
                                       batch_size=minibatch_size,
@@ -103,7 +110,7 @@ class ModelLearner(LoggingModelLearner):
                                       validation_split=0.1,
                                       callbacks=self.Ttensorboard,
                                       verbose=1)
-        else:
+        elif False:
             if self.useRNN:
                 input_data, train_signal = self.setup_batch_for_RNN(np.array(self.obs_memory),
                                                                     np.array(self.reward_memory),
@@ -119,6 +126,23 @@ class ModelLearner(LoggingModelLearner):
                                       validation_split=0.1,
                                       callbacks=self.Rtensorboard,
                                       verbose=1)
+        else:
+            if self.useRNN:
+                input_data, train_signal = self.setup_batch_for_RNN(np.array(self.vel_rew_memory),
+                                                                    np.array(self.ent_pos_memory),
+                                                                    done=self.done_memory)
+            else:
+                input_data = np.array(self.vel_rew_memory)
+                train_signal = np.array(self.ent_pos_memory)
+
+            history = self.dmodel.fit(input_data,
+                                      train_signal,
+                                      batch_size=minibatch_size,
+                                      epochs=self.net_train_epochs,
+                                      validation_split=0.1,
+                                      callbacks=self.Rtensorboard,
+                                      verbose=1)
+
             # DEBUG
             if False:
                 import matplotlib
@@ -158,7 +182,7 @@ class MultiAgentModelLearner(LoggingModelLearner):
         self.joined_actions = False
         self.gather_joined_mem = False
         # how likely a random reset is (1 disables it, 2 is resetting always)
-        self.reset_randomrange = 1  # int(mem_size / 1000) + 2
+        self.reset_randomrange = 2  # int(mem_size / 1000) + 2
         self.mem_size = mem_size
         self.x_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
         self.y_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
@@ -260,7 +284,7 @@ if __name__ == "__main__":
     env_name = 'simple'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=10000, sequence_length=0, scenario_name=env_name, epochs=10)
+    canary = MultiAgentModelLearner(env, mem_size=100000, sequence_length=100, scenario_name=env_name, epochs=100)
     canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
