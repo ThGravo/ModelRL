@@ -26,14 +26,14 @@ def build_regression_model(input_dim,
                            activation=activations[min(i + 1, len(activations) - 1)],
                            return_sequences=i is not num_hlayers - 2))
         model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mae', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc'])
+        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'mape'])
     else:
         model.add(Dense(base_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
         for i in range(num_hlayers - 1):
             model.add(Dense(base_size * dim_multipliers[i + 1],
                             activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mae', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc'])
+        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'mape'])
     # model.summary()
     return model
 
