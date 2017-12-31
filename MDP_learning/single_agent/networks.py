@@ -16,7 +16,7 @@ def build_regression_model(input_dim,
         model.add(Dense(1000,
                         activation=activations[min(i + 1, len(activations) - 1)]))
     model.add(Dense(output_dim, activation='linear'))
-    model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+    model.compile(loss='mae', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc'])
     model.summary()
     return model
 
@@ -38,7 +38,7 @@ def build_recurrent_regression_model(input_dim,
                        return_sequences=i is not num_hlayers - 2))
         # stacked LSTMs need to return a sequence
     model.add(Dense(output_dim, activation='relu'))
-    model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+    model.compile(loss='mae', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc'])
     model.summary()
     return model
 

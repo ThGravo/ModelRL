@@ -7,7 +7,7 @@ from keras.models import Sequential
 # state and action is input and successor state is output
 def build_regression_model(input_dim,
                            output_dim,
-                           base_size=None, # base_size for adaptive size
+                           base_size=None,  # base_size for adaptive size
                            dim_multipliers=(32, 16),
                            activations=('relu', 'sigmoid'),
                            lr=.001,
@@ -26,14 +26,14 @@ def build_regression_model(input_dim,
                            activation=activations[min(i + 1, len(activations) - 1)],
                            return_sequences=i is not num_hlayers - 2))
         model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.compile(loss='mae', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc'])
     else:
         model.add(Dense(base_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
         for i in range(num_hlayers - 1):
             model.add(Dense(base_size * dim_multipliers[i + 1],
                             activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.compile(loss='mae', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc'])
     # model.summary()
     return model
 
@@ -54,5 +54,3 @@ def build_dmodel(input_dim,
     model.compile(loss='binary_crossentropy', optimizer=Adam(lr=lr), metrics=['accuracy'])
     # model.summary()
     return model
-
-
