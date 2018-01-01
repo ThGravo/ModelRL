@@ -106,7 +106,7 @@ class ModelLearner(LoggingModelLearner):
                         batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
-                        #callbacks=self.Ttensorboard,
+                        callbacks=self.Ttensorboard,
                         verbose=1)
 
         '''
@@ -200,7 +200,9 @@ if __name__ == "__main__":
 
     # either just pickle
     if False:  # then save
-        for env_name in ['Swimmer-v1', 'BipedalWalker-v2', 'Ant-v1', 'LunarLander-v2', 'Hopper-v1']:
+        for env_name in ['Swimmer-v1', 'BipedalWalker-v2', 'Ant-v1', 'LunarLander-v2', 'Hopper-v1', 'HalfCheetah-v1',
+                         'Walker2d-v1', 'Humanoid-v1', 'HumanoidStandup-v1', 'Reacher-v1', 'InvertedDoublePendulum-v1',
+                         'InvertedPendulum-v1']:
             env = gym.make(env_name)
             observation_space = env.observation_space
             action_space = env.action_space
