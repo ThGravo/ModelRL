@@ -124,7 +124,8 @@ dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                train_interval=4, delta_clip=1.)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
-if args.mode == 'train':
+
+def train():
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
     # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
@@ -200,7 +201,6 @@ if args.mode == 'train':
     # #######################################################################################################################
     from collections import deque
 
-
     class SynthEnv():
         def __init__(self, tmodel, conv_model, real_env, processor, sequence_len):
             self.tmodel = tmodel
@@ -250,7 +250,6 @@ if args.mode == 'train':
         def reset(self):
             self.state_seq, self.action_seq = self.init_state()
             return self.state_seq[-1].flatten()
-
 
     env2 = SynthEnv(ml_model, model_truncated, env, processor, sequence_length)
 
@@ -305,9 +304,17 @@ if args.mode == 'train':
     dqn3.test(env, nb_episodes=10, visualize=False)
     # #######################################################################################################################
 
-elif args.mode == 'test':
+
+def test():
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
     if args.weights:
         weights_filename = args.weights
     dqn.load_weights(weights_filename)
     dqn.test(env, nb_episodes=10, visualize=True)
+
+
+if __name__ == "__main__":
+    if args.mode == 'train':
+        train()
+    elif args.mode == 'test':
+        test()
