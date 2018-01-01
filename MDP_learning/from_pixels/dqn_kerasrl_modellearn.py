@@ -19,7 +19,7 @@ from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
 INPUT_SHAPE = (84, 84)
 WINDOW_LENGTH = 4
-nb_steps_dqn_fit = 123456  # 1750000
+nb_steps_dqn_fit = 12345  # 1750000
 nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
 target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
 memory_limit = nb_steps_dqn_fit  # 1000000
@@ -199,6 +199,9 @@ def train():
                      callbacks=[TensorBoard(log_dir='./logs/TlearnBIG')])  # , shuffle=False)
 
     # #######################################################################################################################
+
+
+def dyna_train():
     from collections import deque
 
     class SynthEnv():
@@ -272,6 +275,8 @@ def train():
 
     # #######################################################################################################################
 
+
+def validate():
     image_in = Input(shape=input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
@@ -302,7 +307,9 @@ def train():
     dqn3.compile(Adam(lr=.00025), metrics=['mae'])
     dqn.test(env, nb_episodes=10, visualize=False)
     dqn3.test(env, nb_episodes=10, visualize=False)
-    # #######################################################################################################################
+
+
+# #######################################################################################################################
 
 
 def test():
@@ -316,5 +323,7 @@ def test():
 if __name__ == "__main__":
     if args.mode == 'train':
         train()
+        dyna_train()
+        validate()
     elif args.mode == 'test':
         test()
