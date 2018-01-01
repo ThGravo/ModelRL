@@ -2,9 +2,13 @@ from keras import backend as K
 
 
 def COD(y_true, y_pred):
-    SS_res = K.sum(K.square(y_true - y_pred))
-    SS_tot = K.sum(K.square(y_true - K.mean(y_true)))
-    return (1 - SS_res / (SS_tot + K.epsilon()))
+    return K.sum(K.square(y_pred - y_true), axis=-1) / K.sum(K.square(y_pred - K.mean(y_pred, axis=-1)), axis=-1)
+
+
+def Rsquared(y_true, y_pred):
+    SS_res = K.sum(K.square(y_true - y_pred), axis=-1)
+    SS_tot = K.sum(K.square(y_true - K.mean(y_true)), axis=-1)
+    return 1 - SS_res / (SS_tot + K.epsilon())
 
 
 def NRMSE(y_true, y_pred):
