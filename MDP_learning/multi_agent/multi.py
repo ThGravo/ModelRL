@@ -178,7 +178,7 @@ class MultiAgentModelLearner(LoggingModelLearner):
         super().__init__(environment, sequence_length,
                          write_tboard=write_tboard,
                          out_dir_add='scenario_name{}'.format(scenario_name) if scenario_name is not None else None)
-        self.render = True
+        self.render = False
         self.joined_actions = False
         self.gather_joined_mem = False
         # how likely a random reset is (1 disables it, 2 is resetting always)
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     env_name = 'simple'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=100000, sequence_length=100, scenario_name=env_name, epochs=100)
+    canary = MultiAgentModelLearner(env, mem_size=100000, sequence_length=1000, scenario_name=env_name, epochs=100)
     canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
