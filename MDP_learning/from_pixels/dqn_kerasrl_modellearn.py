@@ -17,14 +17,17 @@ from rl.memory import SequentialMemory
 from rl.core import Processor
 from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
+from MDP_learning.helpers.custom_metrics import COD, NRMSE, Rsquared
+
 INPUT_SHAPE = (84, 84)
 WINDOW_LENGTH = 4
-nb_steps_dqn_fit = 12345 # 1750000
+nb_steps_dqn_fit = 12345  # 1750000
 nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
 target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
 memory_limit = nb_steps_dqn_fit  # 1000000
 nb_steps_annealed_policy = int(nb_steps_dqn_fit / 2)  # 1000000
 ml_model_epochs = 19
+
 
 class AtariProcessor(Processor):
     def process_observation(self, observation):
@@ -91,14 +94,16 @@ else:
     enc_state_and_action = concatenate([enc_state_flat, action_in_flat], name='encoded_state_and_action')
     dense_out = Dense(layer_width, activation='relu')(enc_state_and_action)
     dense_out = Dense(layer_width, activation='relu')(dense_out)
-    lstm_out = Dense(int(layer_width/2), activation='relu')(dense_out)
+    lstm_out = Dense(int(layer_width / 2), activation='relu')(dense_out)
 
 state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
 reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
 terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(lstm_out)
 ml_model = Model(inputs=[enc_state, action_in], outputs=[state_pred, reward_pred, terminal_pred])
-ml_model.compile('adam', loss={'predicted_next_state': 'mse', 'predicted_reward': 'mse',
-                               'predicted_terminal': 'binary_crossentropy'}, metrics=['mse', 'mae', 'mape'])
+ml_model.compile('adam', loss={'predicted_next_state': 'mse',
+                               'predicted_reward': 'mse',
+                               'predicted_terminal': 'binary_crossentropy'},
+                 metrics=['mse', 'mae', COD, NRMSE, Rsquared])
 print(ml_model.summary())
 
 log_string = '_{}_slen{}_lwidth{}-{}'.format(env_name, sequence_length, layer_width, time.time())
@@ -206,10 +211,10 @@ def train():
 
         with open("OutputAtariDataStats.txt", "w") as text_file:
             print("Var: {}".format(np.var(next_hstate)), file=text_file)
-            print("Min: {}".format(np.mean(np.min(next_hstate,axis=0))), file=text_file)
-            print("Max: {}".format(np.mean(np.max(next_hstate,axis=0))), file=text_file)
-            print("Min: {}".format(np.min(next_hstate,axis=0)), file=text_file)
-            print("Max: {}".format(np.max(next_hstate,axis=0)), file=text_file)
+            print("Min: {}".format(np.mean(np.min(next_hstate, axis=0))), file=text_file)
+            print("Max: {}".format(np.mean(np.max(next_hstate, axis=0))), file=text_file)
+            print("Min: {}".format(np.min(next_hstate, axis=0)), file=text_file)
+            print("Max: {}".format(np.max(next_hstate, axis=0)), file=text_file)
 
         ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], verbose=1, epochs=ml_model_epochs,
                      callbacks=[TensorBoard(log_dir='./logs/Tlearn'.format(log_string))])  # , shuffle=False)
@@ -328,6 +333,8 @@ def validate(model_truncated, dqn2):
     dqn3.compile(Adam(lr=.00025), metrics=['mae'])
     dqn.test(env, nb_episodes=10, visualize=False)
     dqn3.test(env, nb_episodes=10, visualize=False)
+
+
 # #######################################################################################################################
 
 
