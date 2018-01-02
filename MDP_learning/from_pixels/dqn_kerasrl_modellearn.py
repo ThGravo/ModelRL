@@ -19,7 +19,7 @@ from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
 INPUT_SHAPE = (84, 84)
 WINDOW_LENGTH = 4
-nb_steps_dqn_fit = 1234567  # 1750000
+nb_steps_dqn_fit = 12345 # 1750000
 nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
 target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
 memory_limit = nb_steps_dqn_fit  # 1000000
@@ -52,7 +52,7 @@ parser.add_argument('--mode', choices=['train', 'test'], default='train')
 parser.add_argument('--weights', type=str, default=None)
 args = parser.parse_args()
 
-env_name = 'BreakoutDeterministic-v4'
+env_name = 'SeaquestDeterministic-v4'
 # Get the environment and extract the number of actions.
 env = gym.make(env_name)
 np.random.seed(123)
@@ -75,12 +75,12 @@ print(model.summary())
 hstate_size = int(np.prod(conv3.shape[1:]))
 
 # Model learner network
-USE_LSTM = False
+USE_LSTM = True
 sequence_length = 10 if USE_LSTM else 1
 action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
 action_in = Input(shape=action_shape, name='action_input')
 enc_state = Input(shape=(sequence_length, hstate_size), name='enc_state')
-layer_width = 8192
+layer_width = 4096
 if USE_LSTM:
     action_in_reshape = Reshape((sequence_length, 1))(action_in)
     enc_state_and_action = concatenate([enc_state, action_in_reshape], name='encoded_state_and_action')
@@ -91,7 +91,7 @@ else:
     enc_state_and_action = concatenate([enc_state_flat, action_in_flat], name='encoded_state_and_action')
     dense_out = Dense(layer_width, activation='relu')(enc_state_and_action)
     dense_out = Dense(layer_width, activation='relu')(dense_out)
-    lstm_out = Dense(4096, activation='relu')(dense_out)
+    lstm_out = Dense(int(layer_width/2), activation='relu')(dense_out)
 
 state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
 reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
