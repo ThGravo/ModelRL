@@ -35,7 +35,7 @@ def build_regression_model(input_dim,
                             activation=activations[min(i + 1, len(activations) - 1)]))
         model.add(Dense(output_dim, activation='linear'))
         model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', COD, NRMSE, Rsquared])
-    # model.summary()
+    model.summary()
     return model
 
 
@@ -53,5 +53,5 @@ def build_dmodel(input_dim,
         model.add(Dense(base_size * dim_multipliers[i + 1], activation=activations[i + 1]))
     model.add(Dense(1, activation='sigmoid'))
     model.compile(loss='binary_crossentropy', optimizer=Adam(lr=lr), metrics=['accuracy'])
-    # model.summary()
+    model.summary()
     return model
