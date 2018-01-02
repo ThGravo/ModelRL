@@ -1,6 +1,6 @@
 def sk_eval(model, input_data, train_signal, outfile_name=None):
     from sklearn.metrics import r2_score
-    text_file = open("OutputAtariDataStats.txt", "w") if outfile_name is not None else None
+    text_file = open(outfile_name, "w") if outfile_name is not None else None
 
     if outfile_name is not None:
         print(model.summary(), file=text_file)
