@@ -57,7 +57,7 @@ class ModelLearner(LoggingModelLearner):
             recurrent=self.useRNN,
             dim_multipliers=(128,) if self.use_shallow else (64, 32))
 
-        self.models = [self.tmodel]
+        self.models = [self.tmodel, self.rmodel, self.dmodel]
         self.save_model_config()
 
     def get_action(self, obs_n):
@@ -167,18 +167,15 @@ class ModelLearner(LoggingModelLearner):
                 train_signal = np.array(self.ent_pos_memory)
 
             history = self.dmodel.fit(input_data,
-                                      train_signal,  # Var = 1.5
+                                      train_signal,
                                       batch_size=minibatch_size,
                                       epochs=self.net_train_epochs,
                                       validation_split=0.1,
-                                      callbacks=self.Rtensorboard,
+                                      callbacks=self.Dtensorboard,
                                       verbose=1)
 
             sk_eval(self.dmodel, input_data, train_signal, '{}/dmodel_R2.txt'.format(self.out_dir))
-        # NRMSE
-        # denom = np.array(self.reward_memory).max() - np.array(self.reward_memory).min()
-        # COD
-        # denom =
+
         self.save()
 
 
