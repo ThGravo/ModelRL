@@ -1,6 +1,6 @@
 import tensorflow as tf
 from collections import deque
-from keras.layers import Dense, LSTM, Dropout
+from keras.layers import Dense, LSTM, GRU
 from keras.optimizers import Adam
 from keras.models import Sequential
 import keras as K
@@ -8,9 +8,13 @@ from keras.callbacks import TensorBoard
 import gym
 import random
 import numpy as np
+import pandas as pd
 import matplotlib
 # matplotlib.use('GTK3Cairo', warn=False, force=True)
+from collections import namedtuple
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import Imputer
+from fancyimpute import KNN, SimpleFill, SoftImpute, MICE, IterativeSVD
 
 '''
 GRID SEARCH RESULT
@@ -20,8 +24,8 @@ Best parameter set was
 
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=500000, epochs=5, learning_rate=.001,
-                 tmodel_dim_multipliers=(12, 12), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
+    def __init__(self, observation_space, action_space, data_size=2000000, epochs=5, learning_rate=.001,
+                 tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), sequence_length=1,
                  partial_obs_rate=0.0):
 
         # get size of state and action from environment
@@ -67,47 +71,38 @@ class ModelLearner:
         self.Rtensorboard = []  # [TensorBoard(log_dir='./logs/Rlearn/{}'.format(time()))]
         self.Dtensorboard = []  # [TensorBoard(log_dir='./logs/Dlearn/{}'.format(time()))]
 
-    # approximate Transition function
-    # state and action is input and successor state is output
-    def build_regression_model(self,
-                               input_dim,
-                               output_dim,
-                               dim_multipliers=(6, 4),
-                               activations=('relu', 'relu'),
-                               lr=.001):
-        model = Sequential()
-        model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
-        for i in range(len(dim_multipliers) - 1):
-            model.add(Dense(self.state_size * dim_multipliers[i + 1],
-                            activation=activations[min(i + 1, len(activations) - 1)]))
-        model.add(Dense(output_dim, activation='linear'))
-        if self.partial_obs_rate > 0:
-            model.compile(loss=weighted_mean_squared_error, optimizer=Adam(lr=lr), metrics=['accuracy'])
-        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        # model.summary()
-        return model
+    # get action from model using random policy
+    def get_action(self, state, environment):
+        return environment.action_space.sample()
 
-    def build_recurrent_regression_model(self,
-                                         input_dim,
-                                         output_dim,
-                                         dim_multipliers=(6, 4),
-                                         activations=('relu', 'relu'),
-                                         lr=.001):
-        num_hlayers = len(dim_multipliers)
-        model = Sequential()
-        model.add(LSTM(self.state_size * dim_multipliers[0],
-                       input_shape=(None, input_dim),
-                       activation=activations[0],
-                       return_sequences=num_hlayers is not 1))
-        for i in range(num_hlayers - 1):
-            model.add(LSTM(self.state_size * dim_multipliers[i + 1],
-                           activation=activations[min(i + 1, len(activations) - 1)],
-                           return_sequences=i is not num_hlayers - 2))
-            # stacked LSTMs need to return a sequence
-        model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        # model.summary()
-        return model
+    def refill_mem(self, environment):
+        state = environment.reset()
+        self.memory.clear()
+        for i in range(self.data_size):
+            # get action for the current state and go one step in environment
+            action = self.get_action(state, environment)
+            next_state, reward, done, info = environment.step(action)
+            # save the sample <s, a, r, s'> to the replay memory
+            self.memory.append(np.hstack((state, action, reward, next_state, done * 1)))
+            if done:
+                state = environment.reset()
+            else:
+                state = next_state
+
+    def make_mem_partial_obs(self, memory):
+        masks_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
+                                        p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        masks_next_states = np.random.choice([np.nan, 1.0], size=(len(memory), self.state_size),
+                                             p=[self.partial_obs_rate, 1 - self.partial_obs_rate])
+        memory[:, self.state_size:self.state_size+1] = memory[:, self.state_size:self.state_size+1]
+        for i in range(len(memory)):
+            if i == 0 or memory[i - 1, -1]:
+                memory[i, :self.state_size] = masks_states[i] * memory[i, :self.state_size]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
+            else:
+                memory[i, :self.state_size] = memory[i - 1, self.state_size + self.action_size + 1:-1]
+                memory[i, self.state_size + self.action_size + 1:-1] = masks_next_states[i] * memory[i, self.state_size + self.action_size + 1:-1]
+
 
     def setup_batch_for_RNN(self, batch):
         batch_size = batch.shape[0]
@@ -128,6 +123,52 @@ class ModelLearner:
         y_seq = np.resize(y_seq, (actual_size, self.state_size))
         return x_seq, y_seq
 
+
+    # approximate Transition function
+    # state and action is input and successor state is output
+    def build_regression_model(self,
+                               input_dim,
+                               output_dim,
+                               dim_multipliers=(6, 4),
+                               activations=('sigmoid', 'sigmoid'),
+                               lr=.001):
+        model = Sequential()
+        model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
+        for i in range(len(dim_multipliers) - 1):
+            model.add(Dense(self.state_size * dim_multipliers[i + 1],
+                            activation=activations[min(i + 1, len(activations) - 1)]))
+        model.add(Dense(output_dim, activation='linear'))
+        if self.partial_obs_rate > 0:
+            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        # model.summary()
+        return model
+
+    def build_recurrent_regression_model(self,
+                                         input_dim,
+                                         output_dim,
+                                         dim_multipliers=(6, 4),
+                                         activations=('sigmoid', 'sigmoid'),
+                                         lr=.001):
+        num_hlayers = len(dim_multipliers)
+        model = Sequential()
+        model.add(LSTM(self.state_size * dim_multipliers[0],
+                       input_shape=(None, input_dim),
+                       activation=activations[0],
+                       return_sequences=num_hlayers is not 1
+                       ))
+        for i in range(num_hlayers - 1):
+            model.add(LSTM(self.state_size * dim_multipliers[i + 1],
+                           activation=activations[min(i + 1, len(activations) - 1)],
+                           return_sequences=i is not num_hlayers - 2))
+            # stacked LSTMs need to return a sequence
+        model.add(Dense(output_dim, activation='relu'))
+        if self.partial_obs_rate > 0:
+            model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+        # model.summary()
+        return model
+
     # approximate Done value
     # state is input and reward is output
     def build_dmodel(self,
@@ -144,43 +185,65 @@ class ModelLearner:
         # model.summary()
         return model
 
-    # get action from model using random policy
-    def get_action(self, state, environment):
-        return environment.action_space.sample()
-
     # pick samples randomly from replay memory (with batch_size)
     def train_models(self, minibatch_size=32):
-        batch_size = len(self.memory)
-        minibatch_size = min(minibatch_size, batch_size)
-        batch = self.memory
+        memory_arr = np.array(self.memory)
+        file = "memoryBW.npy"
+        np.save(file, memory_arr)
 
-        if self.useRNN:
-            t_x, t_y = self.setup_batch_for_RNN(batch)
+        if self.partial_obs_rate > 0:
+            self.make_mem_partial_obs(memory_arr)
+            file1 = "memoryBWcorrupted.npy"
+            np.save(file1, memory_arr)
+            print("Memory size:")
+            print(memory_arr.size)
+            print("Proportion of missing values:")
+            print(np.isnan(memory_arr).sum() / memory_arr.size)
+            #memory_train = np.array([exp for exp in memory_arr if not np.isnan(exp[-self.state_size - 1:-1]).any()])
+            #imputer = Imputer()
+            #memory_final = imputer.fit_transform(memory_train)
+            memory_final = SoftImpute().complete(memory_arr)
+            file2 = "memoryBWimputedSoft.npy"
+            np.save(file2, memory_final)
         else:
-            t_x = batch[:, :self.state_size + self.action_size]
-            t_y = batch[:, -self.state_size - 1:-1]
+            memory_final = memory_arr
+        if self.useRNN:
+            batch_size = len(memory_final)
+            minibatch_size = min(minibatch_size, batch_size)
+            t_x, t_y = self.setup_batch_for_RNN(memory_final)
+            self.tmodel.fit(t_x, t_y,
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Ttensorboard, verbose=1)
+        else:
+            batch_size = len(memory_arr)
+            minibatch_size = min(minibatch_size, batch_size)
+            # batch = random.sample(list(memory_final), minibatch_size)
+            # batch = np.array(batch)
+            # batch = memory_arr
+            t_x = memory_final[:, :self.state_size + self.action_size]
+            t_y = memory_final[:, -self.state_size - 1:-1]
+            self.tmodel.fit(t_x, t_y,
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Ttensorboard, verbose=1)
+            '''
+            self.rmodel.fit(batch[:, :self.state_size],
+                            batch[:, self.state_size + self.action_size],
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Rtensorboard, verbose=0)
 
-        # and do the model fit
-        self.tmodel.fit(t_x, t_y,
-                        batch_size=minibatch_size,
-                        epochs=self.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=self.Ttensorboard, verbose=1)
-
-        self.rmodel.fit(batch[:, :self.state_size],
-                        batch[:, self.state_size + self.action_size],
-                        batch_size=minibatch_size,
-                        epochs=self.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=self.Rtensorboard, verbose=0)
-
-        self.dmodel.fit(batch[:, :self.state_size],
-                        batch[:, -1],
-                        batch_size=minibatch_size,
-                        epochs=self.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=self.Dtensorboard, verbose=0)
-
+            self.dmodel.fit(batch[:, :self.state_size],
+                            batch[:, -1],
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Dtensorboard, verbose=0)
+            '''
     def step(self, state, action):
         batch_size = 1
         state = np.reshape(state, [1, self.state_size])
@@ -201,28 +264,6 @@ class ModelLearner:
         return next_state[0], float(reward[0, 0]), bool(done[0, 0] > .8)
         # TODO how sure do we want to be about being done? 80%? 90?
         # TODO yah to force the type to be the same as in gym environment (flatten?)
-
-    def refill_mem(self, environment):
-        state = environment.reset()
-        self.memory.clear()
-        for i in range(self.data_size):
-            # get action for the current state and go one step in environment
-            action = self.get_action(state, environment)
-            next_state, reward, done, info = environment.step(action)
-
-            # save the sample <s, a, r, s'> to the replay memory
-            self.memory.append(np.hstack((state, action, reward, next_state, done * 1)))
-
-            if done:  # and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
-                state = environment.reset()
-            else:
-                state = next_state
-        self.memory = np.array(self.memory)
-        rescaling_factor = self.memory.min()
-        self.memory = (abs(rescaling_factor) + 100) + self.memory
-        mask = np.random.choice([0, 1], size=self.memory.shape, p=[self.partial_obs_rate, 1-self.partial_obs_rate])
-        self.memory = mask * self.memory
-
 
     def run(self, environment, rounds=1):
         for e in range(rounds):
@@ -279,11 +320,26 @@ def weighted_mean_squared_error(y_true, y_pred):
 
 
 if __name__ == "__main__":
-    # ['Ant-v1', 'LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
-    for env_name in ['Ant-v1']:
-        env = gym.make(env_name)
+    # ['Ant-v1', 'LunarLander-v2', 'BipedalWalker-v2', FrozenLake8x8-v0, 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
+    for env_name in ['Swimmer-v1', 'Hopper-v1']:
+        print(env_name)
+        for round in range(2):
+            print(round)
+            env = gym.make(env_name)
+            canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.0, sequence_length=1)
+            canary.refill_mem(env)
+            memory_arr = np.array(canary.memory)
+            print("Saving memory")
+            np.save('/home/aocc/code/DL/MDP_learning/save_memory/' + str(env_name) + 'FULL' + 'round' + str(round), memory_arr)
+            for rate in [0.1, 0.2, 0.3]:
+                print(rate)
+                canary1 = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=rate, sequence_length=1)
+                canary1.memory = canary.memory
+                memory_arr = np.array(canary1.memory)
+                canary1.make_mem_partial_obs(memory_arr)
+                print("Saving corrupted memory")
+                np.save('/home/aocc/code/DL/MDP_learning/save_memory/' + str(env_name) + 'CORRUPT' + str(rate) + 'round' + str(round), memory_arr)
+                memory_final = SoftImpute().complete(memory_arr)
+                print("Saving imputed memory")
+                np.save('/home/aocc/code/DL/MDP_learning/save_memory/' + str(env_name) + 'IMPUTED' + str(rate) + 'round' + str(round), memory_final)
 
-        canary = ModelLearner(env.observation_space, env.action_space, partial_obs_rate=0.3, sequence_length=5)
-        canary.run(env, rounds=8)
-
-        print('MSE: {}'.format(canary.evaluate(env)))

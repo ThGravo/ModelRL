@@ -1,3 +1,24 @@
+Parameter set {'sequence_length': 1, 'tmodel_dim_multipliers': (12, 12)} achieved score of 0.044087962040377925
+Parameter set {'sequence_length': 1, 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.05018522158200351
+Parameter set {'sequence_length': 2, 'tmodel_dim_multipliers': (6,)} achieved score of 0.05562478963633509
+Parameter set {'sequence_length': 2, 'tmodel_dim_multipliers': (12, 12)} achieved score of 0.056130611931428764
+Parameter set {'sequence_length': 2, 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.057228736331000916
+Parameter set {'sequence_length': 2, 'tmodel_dim_multipliers': (6, 6, 6)} achieved score of 0.06263130231763601
+Parameter set {'sequence_length': 1, 'tmodel_dim_multipliers': (6, 6, 6)} achieved score of 0.06321936965906982
+Parameter set {'sequence_length': 8, 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.06931333507649927
+Parameter set {'sequence_length': 8, 'tmodel_dim_multipliers': (6,)} achieved score of 0.07033776883971712
+Parameter set {'sequence_length': 8, 'tmodel_dim_multipliers': (6, 6, 6)} achieved score of 0.07533519256991561
+Parameter set {'sequence_length': 8, 'tmodel_dim_multipliers': (12, 12)} achieved score of 0.07881883709200799
+Parameter set {'sequence_length': 16, 'tmodel_dim_multipliers': (6,)} achieved score of 0.08616740783110464
+Parameter set {'sequence_length': 1, 'tmodel_dim_multipliers': (6,)} achieved score of 0.0918095152005669
+Parameter set {'sequence_length': 16, 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.09576207892319985
+Parameter set {'sequence_length': 16, 'tmodel_dim_multipliers': (12, 12)} achieved score of 0.10000397898508155
+Parameter set {'sequence_length': 16, 'tmodel_dim_multipliers': (6, 6, 6)} achieved score of 0.11564810559579297
+Best parameter set was {'sequence_length': 1, 'tmodel_dim_multipliers': (12, 12)} with score of 0.044087962040377925
+Worst parameter set was {'sequence_length': 16, 'tmodel_dim_multipliers': (6, 6, 6)} with score of 0.11564810559579297
+Execution time: 208004.50963664055 sec
+
+
 Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.0635603486255829
 Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (12, 3)} achieved score of 0.0666069888056455
 Parameter set {'learning_rate': 0.001, 'tmodel_activations': ('tanh', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)} achieved score of 0.06664066006153316

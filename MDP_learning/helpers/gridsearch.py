@@ -3,7 +3,7 @@ import multiprocessing
 import numpy as np
 from sklearn.model_selection import ParameterGrid
 import gym
-import transition_learning_RNN as transition_learning
+import MDP_learning.transition_learning as transition_learning
 
 N_RUNS = 1
 

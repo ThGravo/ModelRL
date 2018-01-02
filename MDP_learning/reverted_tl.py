@@ -1,7 +1,6 @@
 import tensorflow as tf
-
 from collections import deque
-from keras.layers import Dense, LSTM
+from keras.layers import Dense, LSTM, Activation, Dropout, Flatten, TimeDistributed
 from keras.optimizers import Adam
 from keras.models import Sequential
 from keras.callbacks import TensorBoard
@@ -11,6 +10,7 @@ import numpy as np
 import matplotlib
 # matplotlib.use('GTK3Cairo', warn=False, force=True)
 import matplotlib.pyplot as plt
+from itertools import chain
 
 '''
 GRID SEARCH RESULT
@@ -18,9 +18,17 @@ Best parameter set was
 {'learning_rate': 0.001, 'tmodel_activations': ('relu', 'sigmoid'), 'tmodel_dim_multipliers': (6, 6)}
 '''
 
+'''
+def block_obs(self, state, prob):
+    for x in range(self.state_size):
+        rand = random.random()
+        if rand > prob:
+            state[x] = None
+    return state
+'''
 
 class ModelLearner:
-    def __init__(self, observation_space, action_space, data_size=10000, epochs=4, learning_rate=.001,
+    def __init__(self, observation_space, action_space, data_size=10000, epochs=4, trace_length=3, learning_rate=.001,
                  tmodel_dim_multipliers=(6, 6), tmodel_activations=('relu', 'sigmoid'), recurrent=False):
 
         # get size of state and action from environment
@@ -37,8 +45,10 @@ class ModelLearner:
         self.learning_rate = learning_rate
         self.net_train_epochs = epochs
         self.data_size = data_size
+        self.trace_length = trace_length
         self.memory = deque(maxlen=self.data_size)
         self.recurrent = recurrent
+
 
         self.tmodel = self.build_regression_model(self.state_size + self.action_size, self.state_size, lr=learning_rate,
                                                   dim_multipliers=tmodel_dim_multipliers,
@@ -62,9 +72,11 @@ class ModelLearner:
                                lr=.001):
         model = Sequential()
         if self.recurrent:
-            model.add(LSTM(64, input_dim=1))
-            model.add(Dense(output_dim, activation='linear'))
+            model.add(LSTM(64, input_shape=(self.trace_length-1,input_dim)))
+            model.add(Dense(64, activation='linear'))
             model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
+            print(model.summary())
+            return model
         else:
             model.add(Dense(self.state_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
             for i in range(len(dim_multipliers) - 1):
@@ -72,8 +84,13 @@ class ModelLearner:
                                 activation=activations[min(i + 1, len(activations) - 1)]))
             model.add(Dense(output_dim, activation='linear'))
             model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['accuracy'])
-        model.summary()
+            print(model.summary())
         return model
+
+    def weighted_mean_squared_error(y_true, y_pred):
+        total = K.backend.sum(K.backend.square(K.backend.abs(K.backend.sign(y_true)) * (y_pred - y_true)), axis=-1)
+        count = K.backend.sum(K.backend.abs(K.backend.sign(y_true)))
+        return total / count
 
     # approximate Done value
     # state is input and reward is output
@@ -100,15 +117,31 @@ class ModelLearner:
         batch_size = len(self.memory)
         minibatch_size = min(minibatch_size, batch_size)
 
-        batch = np.array(self.memory)
-
-        # and do the model fit
-        self.tmodel.fit(batch[:, :self.state_size + self.action_size],
-                        batch[:, -self.state_size - 1:-1],
-                        batch_size=minibatch_size,
-                        epochs=self.net_train_epochs,
-                        validation_split=0.1,
-                        callbacks=self.Ttensorboard, verbose=1)
+        if self.recurrent:
+            batch = self.sample_traces(batch_size)
+            self.tmodel.fit(batch[:, :-1],
+                            batch[:, self.trace_length-1:, :-1],
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Ttensorboard, verbose=1)
+            '''
+            batch = self.sample_traces(batch_size)
+            self.tmodel.fit(batch[:, :(self.trace_length-1)*(self.state_size + self.action_size)],
+                            batch[:, (self.trace_length-1)*(self.state_size + self.action_size)+1:],
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Ttensorboard, verbose=1)
+            '''
+        else:
+            batch = np.array(self.memory)
+            self.tmodel.fit(batch[:-1, :self.state_size + self.action_size],
+                            batch[1:,:self.state_size],
+                            batch_size=minibatch_size,
+                            epochs=self.net_train_epochs,
+                            validation_split=0.1,
+                            callbacks=self.Ttensorboard, verbose=1)
 
         # TODO Currently predicts reward based on state input data.
         #  Should we consider making reward predictions action-dependent too?
@@ -147,13 +180,27 @@ class ModelLearner:
             action = self.get_action(state, environment)
             next_state, reward, done, info = environment.step(action)
 
-            # save the sample <s, a, r, s'> to the replay memory
-            self.memory.append(np.hstack((state, action, reward, next_state, done * 1)))
+            # save the sample <s, a, r> to the replay memory
+            self.memory.append(np.hstack((state, action, reward, done * 1)))
 
             if done:  # and np.random.rand() <= .5:  # TODO super hacky way to get 0 rewards in cartpole
                 state = environment.reset()
             else:
                 state = next_state
+
+    def sample_traces(self, batch_size):
+        sampledTraces = []
+        counter = batch_size
+        while counter > 0:
+            point = random.sample(range(len(self.memory) - self.trace_length), 1)[0]
+            trace_points = range(point, point + self.trace_length)
+            if all(self.memory[p][-1]==0 for p in trace_points[:-1]):
+                trace = [self.memory[p][:self.state_size+self.action_size] for p in trace_points]
+                sampledTraces.append(trace)
+                counter -= 1
+        sampledTraces = np.array(sampledTraces).reshape((batch_size,self.trace_length,self.state_size+self.action_size))
+        return sampledTraces
+
 
     def run(self, environment, rounds=1):
         for e in range(rounds):
@@ -204,10 +251,10 @@ class ModelLearner:
 
 
 if __name__ == "__main__":
-    for env_name in ['Ant-v1']:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"
+    for env_name in ['CartPole-v1']:  # ['LunarLander-v2', 'MountainCar-v0', 'Acrobot-v1', 'CartPole-v1']:"Pong-ram-v4"'Ant-v1'
         env = gym.make(env_name)
 
-        canary = ModelLearner(env.observation_space, env.action_space)
+        canary = ModelLearner(env.observation_space, env.action_space, recurrent=True)
         canary.run(env, rounds=8)
 
         print('MSE: {}'.format(canary.evaluate(env)))
