@@ -114,7 +114,7 @@ class ModelLearner(LoggingModelLearner):
                                       validation_split=0.1,
                                       callbacks=self.Ttensorboard,
                                       verbose=1)
-            sk_eval(self.tmodel, input_data, train_signal)
+            sk_eval(self.tmodel, input_data, train_signal, 'tmodel_R2.txt'.format(self.out_dir))
 
         if True:  # predicting rewards from observations
             if self.useRNN:
@@ -132,7 +132,7 @@ class ModelLearner(LoggingModelLearner):
                                       validation_split=0.1,
                                       callbacks=self.Rtensorboard,
                                       verbose=1)
-            sk_eval(self.rmodel, input_data, train_signal)
+            sk_eval(self.rmodel, input_data, train_signal, 'rmodel_R2.txt'.format(self.out_dir))
 
             # DEBUG
             if False:
@@ -171,7 +171,7 @@ class ModelLearner(LoggingModelLearner):
                                       callbacks=self.Rtensorboard,
                                       verbose=1)
 
-            sk_eval(self.dmodel, input_data, train_signal)
+            sk_eval(self.dmodel, input_data, train_signal, 'dmodel_R2.txt'.format(self.out_dir))
 
         # NRMSE
         denom = np.array(self.reward_memory).max() - np.array(self.reward_memory).min()
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     env_name = 'simple'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=100000, sequence_length=1, scenario_name=env_name, epochs=10)
+    canary = MultiAgentModelLearner(env, mem_size=10000, sequence_length=1, scenario_name=env_name, epochs=10)
     canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
