@@ -182,7 +182,6 @@ class ModelLearner(LoggingModelLearner):
         self.save()
 
 
-
 class MultiAgentModelLearner(LoggingModelLearner):
     def __init__(self, environment, mem_size=3000, epochs=4, learning_rate=.001,
                  sequence_length=0, write_tboard=True, scenario_name=None):
@@ -194,7 +193,7 @@ class MultiAgentModelLearner(LoggingModelLearner):
         self.gather_joined_mem = False
         self.random_resets = True
         # how likely a random reset is (1 is resetting always)
-        self.reset_randomrange = 1  # int(mem_size / 1000) + 2
+        self.reset_randomrange = 3 if sequence_length > 0 else int(mem_size / 100) + 2
         self.mem_size = mem_size
         self.x_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
         self.y_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
@@ -293,9 +292,13 @@ class MultiAgentModelLearner(LoggingModelLearner):
 
 if __name__ == "__main__":
     env_name = 'simple'
-    env = make_env2.make_env(env_name)
-
-    canary = MultiAgentModelLearner(env, mem_size=10000, sequence_length=1, scenario_name=env_name, epochs=10)
-    canary.run(rounds=1)
+    for env_name in ['simple', 'simple_spread', 'simple_push']:
+        env = make_env2.make_env(env_name)
+        for s in [0, 3, 10, 30, 100, 300]:
+            canary = MultiAgentModelLearner(env, scenario_name=env_name,
+                                            mem_size=10000 * (s + 1),
+                                            sequence_length=s,
+                                            epochs=100)
+            canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
