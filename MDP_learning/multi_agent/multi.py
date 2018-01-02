@@ -136,7 +136,7 @@ class ModelLearner(LoggingModelLearner):
                 train_signal = np.array(self.ent_pos_memory)
 
             history = self.dmodel.fit(input_data,
-                                      train_signal,
+                                      train_signal,  # Var = 1.5
                                       batch_size=minibatch_size,
                                       epochs=self.net_train_epochs,
                                       validation_split=0.1,
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     env_name = 'simple'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=100000, sequence_length=1000, scenario_name=env_name, epochs=100)
+    canary = MultiAgentModelLearner(env, mem_size=10000, sequence_length=20, scenario_name=env_name, epochs=100)
     canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
