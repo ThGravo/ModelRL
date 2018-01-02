@@ -1,11 +1,12 @@
 from MDP_learning.multi_agent import make_env2
 import MDP_learning.multi_agent.policies as MAPolicies
 from MDP_learning.helpers import build_models
+from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
+from MDP_learning.helpers.model_evaluation import sk_eval
+
 from collections import deque
 import random
 import numpy as np
-
-from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
 
 
 class ModelLearner(LoggingModelLearner):
@@ -27,6 +28,10 @@ class ModelLearner(LoggingModelLearner):
         self.next_obs_memory = deque(maxlen=mem_size)
         self.obs_memory = deque(maxlen=mem_size)
         self.reward_memory = deque(maxlen=mem_size)
+        self.done_memory = deque(maxlen=mem_size)
+
+        self.vel_rew_memory = deque(maxlen=mem_size)
+        self.ent_pos_memory = deque(maxlen=mem_size)
 
         self.agent_id = agent_id
         self.policy = MAPolicies.RandomPolicy(env, self.agent_id)
@@ -40,8 +45,14 @@ class ModelLearner(LoggingModelLearner):
             input_dim=self.env.observation_space[self.agent_id].shape[0],
             output_dim=1,
             recurrent=self.useRNN,
-            dim_multipliers=(320, 160),
-            activations=('relu', 'relu'))
+            # activations=('relu', 'relu')
+        )
+        # used to predict the locations of a landmarks based on movement and reward sequence
+        self.dmodel = build_models.build_regression_model(
+            input_dim=2 + 1,
+            output_dim=self.env.observation_space[self.agent_id].shape[0] - 2,
+            # dim_multipliers=(320, 160),
+            recurrent=self.useRNN)
 
         self.models = [self.tmodel]
         self.save_model_config()
@@ -54,49 +65,121 @@ class ModelLearner(LoggingModelLearner):
         self.x_memory.append(np.concatenate((obs, act)))
         self.next_obs_memory.append(obs_next)
         self.obs_memory.append(obs)
-        self.reward_memory.append([-np.sqrt(-reward)])
-        # self.reward_memory.append([1.0])
+        # self.reward_memory.append([-np.sqrt(-reward)])
+        self.reward_memory.append([reward])
+        self.done_memory.append([done])
+
+        self.vel_rew_memory.append(np.hstack((obs[:2], reward)))
+        self.ent_pos_memory.append(obs[2:])
 
     def clear_mem(self):
         self.x_memory.clear()
         self.next_obs_memory.clear()
 
-    def setup_batch_for_RNN(self, batch):
-        array_size = batch.shape[0] - self.sequence_length
-        seq = np.empty((array_size, self.sequence_length, batch.shape[1]))
+    def setup_batch_for_RNN(self, input_batch, signal, done):
+        array_size = input_batch.shape[0] - self.sequence_length
         actual_size = 0
-        for jj in range(array_size):
-            # NO terminals here if not batch[jj:jj + self.sequence_length - 1, -1].any():
-            seq[actual_size, ...] = batch[np.newaxis,
-                                    jj:jj + self.sequence_length, :]
-            actual_size += 1
 
-        # no term seq = np.resize(seq, (actual_size, self.sequence_length, -1))
-        return seq
+        seq = np.empty((array_size, self.sequence_length, input_batch.shape[1]))
+        output = np.empty((array_size, signal.shape[1]))
+
+        for jj in range(1, array_size, max(1, self.sequence_length)):
+            if jj % 1000 == 1:
+                print('Filling data for RNN: {} of {} ({} w/o terminals)'.format(jj, array_size, actual_size))
+            # NO intermediate terminals
+            if not np.array(done)[jj:jj + self.sequence_length - 1, :].any():
+                seq[actual_size, ...] = input_batch[np.newaxis, jj:jj + self.sequence_length, :]
+                output[actual_size, ...] = signal[jj + self.sequence_length, :]
+                actual_size += 1
+
+        seq.resize((actual_size, self.sequence_length, input_batch.shape[1]))
+        output.resize((actual_size, signal.shape[1]))
+        print('Done filling the data!')
+        return seq, output
 
     def train_models(self, minibatch_size=32):
-        if False:
-            input_data = self.setup_batch_for_RNN(np.array(self.x_memory)) if self.useRNN else np.array(self.x_memory)
-            self.tmodel.fit(input_data,
-                            np.array(self.next_obs_memory),
-                            batch_size=minibatch_size,
-                            epochs=self.net_train_epochs,
-                            validation_split=0.1,
-                            callbacks=self.Ttensorboard,
-                            verbose=1)
-        else:
-            input_data = self.setup_batch_for_RNN(np.array(self.obs_memory)) if self.useRNN else np.array(
-                self.obs_memory)
-            train_signal = np.array(self.reward_memory)[self.sequence_length:, :] if self.useRNN else np.array(
-                self.reward_memory)
-            self.rmodel.fit(input_data,
-                            train_signal,
-                            batch_size=minibatch_size,
-                            epochs=self.net_train_epochs,
-                            validation_split=0.1,
-                            callbacks=self.Rtensorboard,
-                            verbose=1)
-        # self.save()
+        if True:  # predictiong state transitions
+            if self.useRNN:
+                input_data, train_signal = self.setup_batch_for_RNN(np.array(self.x_memory),
+                                                                    np.array(self.next_obs_memory),
+                                                                    done=self.done_memory)
+            else:
+                input_data = np.array(self.x_memory)
+                train_signal = np.array(self.next_obs_memory)
+
+            history = self.tmodel.fit(input_data,
+                                      train_signal,
+                                      batch_size=minibatch_size,
+                                      epochs=self.net_train_epochs,
+                                      validation_split=0.1,
+                                      callbacks=self.Ttensorboard,
+                                      verbose=1)
+            sk_eval(self.tmodel, input_data, train_signal, 'tmodel_R2.txt'.format(self.out_dir))
+
+        if True:  # predicting rewards from observations
+            if self.useRNN:
+                input_data, train_signal = self.setup_batch_for_RNN(np.array(self.obs_memory),
+                                                                    np.array(self.reward_memory),
+                                                                    done=self.done_memory)
+            else:
+                input_data = np.array(self.obs_memory)
+                train_signal = np.array(self.reward_memory)
+
+            history = self.rmodel.fit(input_data,
+                                      train_signal,
+                                      batch_size=minibatch_size,
+                                      epochs=self.net_train_epochs,
+                                      validation_split=0.1,
+                                      callbacks=self.Rtensorboard,
+                                      verbose=1)
+            sk_eval(self.rmodel, input_data, train_signal, 'rmodel_R2.txt'.format(self.out_dir))
+
+            # DEBUG
+            if False:
+                import matplotlib
+                matplotlib.use('GTK3Cairo', warn=False, force=True)
+                from mpl_toolkits.mplot3d import Axes3D
+                import matplotlib.pyplot as plt
+
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+                ax.scatter(np.array(self.obs_memory)[:, 2],
+                           np.array(self.obs_memory)[:, 3],
+                           np.array(self.reward_memory),
+                           c='b', marker='^')
+
+                ax.scatter(np.array(self.obs_memory)[:, 2],
+                           np.array(self.obs_memory)[:, 3],
+                           self.rmodel.predict(np.array(self.obs_memory)),
+                           c='r', marker='o')
+                plt.show()
+
+        if True:  # Predicting relative position of entities from movement and rewards
+            if self.useRNN:
+                input_data, train_signal = self.setup_batch_for_RNN(np.array(self.vel_rew_memory),
+                                                                    np.array(self.ent_pos_memory),
+                                                                    done=self.done_memory)
+            else:
+                input_data = np.array(self.vel_rew_memory)
+                train_signal = np.array(self.ent_pos_memory)
+
+            history = self.dmodel.fit(input_data,
+                                      train_signal,  # Var = 1.5
+                                      batch_size=minibatch_size,
+                                      epochs=self.net_train_epochs,
+                                      validation_split=0.1,
+                                      callbacks=self.Rtensorboard,
+                                      verbose=1)
+
+            sk_eval(self.dmodel, input_data, train_signal, 'dmodel_R2.txt'.format(self.out_dir))
+
+        # NRMSE
+        denom = np.array(self.reward_memory).max() - np.array(self.reward_memory).min()
+
+        # COD
+        # denom =
+
+        self.save()
 
 
 class MultiAgentModelLearner(LoggingModelLearner):
@@ -105,9 +188,12 @@ class MultiAgentModelLearner(LoggingModelLearner):
         super().__init__(environment, sequence_length,
                          write_tboard=write_tboard,
                          out_dir_add='scenario_name{}'.format(scenario_name) if scenario_name is not None else None)
-        self.render = True
+        self.render = False
         self.joined_actions = False
         self.gather_joined_mem = False
+        self.random_resets = True
+        # how likely a random reset is (1 is resetting always)
+        self.reset_randomrange = 3 if sequence_length > 0 else int(mem_size / 100) + 2
         self.mem_size = mem_size
         self.x_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
         self.y_memory = deque(maxlen=mem_size if self.gather_joined_mem else 1)
@@ -160,8 +246,11 @@ class MultiAgentModelLearner(LoggingModelLearner):
             # do a transition
             obs_n_next, act_n_real, reward_n, done_n, info_n = self.get_transition(act_n)
 
+            if ((ii % self.sequence_length) == 0 if self.sequence_length > 0 else True) \
+                    and self.random_resets and random.randrange(self.reset_randomrange) == 0:
+                done_n = [True for _ in self.env.agents]
+
             # save the sample <s, a, r, s'>
-            # TODO is there any point in learning done in this environment
             self.x_memory.append((np.array(obs_n).flatten(), np.array(act_n_real).flatten()))
             self.y_memory.append((np.array(reward_n).flatten(), np.array(obs_n_next).flatten()))
 
@@ -175,12 +264,11 @@ class MultiAgentModelLearner(LoggingModelLearner):
 
             obs_n = obs_n_next
 
-            # render and reset?
+            if any(done_n):
+                obs_n = env.reset()
+
             if self.render:
                 env.render()
-            if any(done_n) or random.randrange(1234) == 0:  # do a random restart
-                obs_n = env.reset()
-                print("DONE")
 
     def setup_batch_for_RNN(self, batch):
         raise NotImplementedError
@@ -204,9 +292,13 @@ class MultiAgentModelLearner(LoggingModelLearner):
 
 if __name__ == "__main__":
     env_name = 'simple'
-    env = make_env2.make_env(env_name)
-
-    canary = MultiAgentModelLearner(env, mem_size=10000, sequence_length=0, scenario_name=env_name, epochs=10)
-    canary.run(rounds=1)
+    for env_name in ['simple', 'simple_spread', 'simple_push']:
+        env = make_env2.make_env(env_name)
+        for s in [0, 3, 10, 30, 100, 300]:
+            canary = MultiAgentModelLearner(env, scenario_name=env_name,
+                                            mem_size=10000 * (s + 1),
+                                            sequence_length=s,
+                                            epochs=100)
+            canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
