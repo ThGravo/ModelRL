@@ -9,6 +9,7 @@ from MDP_learning.single_agent.preprocessing import standardise_memory, make_mem
     impute_missing
 from MDP_learning.single_agent.networks import build_regression_model, build_recurrent_regression_model, build_dmodel
 from time import time
+import random
 
 from MDP_learning.helpers.logging_model_learner import LoggingModelLearner
 
@@ -92,7 +93,7 @@ class ModelLearner(LoggingModelLearner):
             impute_missing(memory_arr, self.state_size, MICE)
         else:
         '''
-        # standardise_memory(memory_arr, self.state_size, self.action_size)
+        standardise_memory(memory_arr, self.state_size, self.action_size)
         batch_size = len(memory_arr)
         minibatch_size = min(minibatch_size, batch_size)
 
@@ -106,7 +107,7 @@ class ModelLearner(LoggingModelLearner):
                         batch_size=minibatch_size,
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
-                        #callbacks=self.Ttensorboard,
+                        callbacks=self.Ttensorboard,
                         verbose=1)
 
         '''
@@ -211,14 +212,15 @@ if __name__ == "__main__":
 
     else:
         # or load pickle and run a training
-        env_name = "Swimmer-v1"
+        env_name = "BipedalWalker-v2"
         with open('{}_observation_space.pickle'.format(env_name), 'rb') as f:
             observation_space = pickle.load(f)
         with open('{}_action_space.pickle'.format(env_name), 'rb') as f:
             action_space = pickle.load(f)
-
-        canary = ModelLearner(env_name, observation_space, action_space, partial_obs_rate=0.01, sequence_length=3)
-        mem = np.load('../save_memory/{}IMPUTED0.01round<built-in function round>.npy'.format(env_name))
-        print(mem.shape)
+        canary = ModelLearner(env_name, observation_space, action_space, partial_obs_rate=0.1, sequence_length=0)
+        mem = np.load('../save_memory/{}FULLround0.npy'.format(env_name))
+        #make_mem_partial_obs(mem,canary.state_size,0.5)
+        # mem1 = mem # SimpleFill().complete(mem)
+        standardise_memory(mem,canary.state_size,canary.action_size)
         canary.memory = mem
         canary.train_models()
