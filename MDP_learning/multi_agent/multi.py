@@ -41,13 +41,13 @@ class ModelLearner(LoggingModelLearner):
             input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
             output_dim=self.env.observation_space[self.agent_id].shape[0],
             recurrent=self.useRNN,
-            dim_multipliers=(128,) if self.use_shallow else (64, 32))
+            dim_multipliers=(32,) if self.use_shallow else (16, 16))
 
         self.rmodel = build_models.build_regression_model(
             input_dim=self.env.observation_space[self.agent_id].shape[0],
             output_dim=1,
             recurrent=self.useRNN,
-            dim_multipliers=(128,) if self.use_shallow else (64, 32)
+            dim_multipliers=(32,) if self.use_shallow else (16, 16)
             # activations=('relu', 'relu')
         )
         # used to predict the locations of a landmarks based on movement and reward sequence
@@ -55,7 +55,7 @@ class ModelLearner(LoggingModelLearner):
             input_dim=2 + 1,
             output_dim=self.env.observation_space[self.agent_id].shape[0] - 2,
             recurrent=self.useRNN,
-            dim_multipliers=(128,) if self.use_shallow else (64, 32))
+            dim_multipliers=(32,) if self.use_shallow else (16, 16))
 
         self.models = [self.tmodel, self.rmodel, self.dmodel]
         self.save_model_config()
