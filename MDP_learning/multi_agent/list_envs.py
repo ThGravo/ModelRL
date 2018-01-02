@@ -23,7 +23,7 @@ envall = ['simple', 'simple_adversary', 'simple_crypto', 'simple_push', 'simple_
           'simple_spread', 'simple_tag', 'simple_world_comm']
 
 for e in envall:
-    env = make_env.make_env(e)
+    env = make_env2.make_env(e)
     agent_action_range = []
     agent_action_size = []
     for i, a in enumerate(env.agents):
