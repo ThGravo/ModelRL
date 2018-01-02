@@ -1,7 +1,7 @@
 from __future__ import division
 import argparse
 import random
-
+import time
 from PIL import Image
 import numpy as np
 import gym
@@ -19,12 +19,12 @@ from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
 INPUT_SHAPE = (84, 84)
 WINDOW_LENGTH = 4
-nb_steps_dqn_fit = 12345  # 1750000
+nb_steps_dqn_fit = 1234567  # 1750000
 nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
 target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
 memory_limit = nb_steps_dqn_fit  # 1000000
 nb_steps_annealed_policy = int(nb_steps_dqn_fit / 2)  # 1000000
-
+ml_model_epochs = 19
 
 class AtariProcessor(Processor):
     def process_observation(self, observation):
@@ -48,12 +48,13 @@ class AtariProcessor(Processor):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', choices=['train', 'test'], default='train')
-parser.add_argument('--env-name', type=str, default='PongDeterministic-v4')
+# parser.add_argument('--env-name', type=str, default=)
 parser.add_argument('--weights', type=str, default=None)
 args = parser.parse_args()
 
+env_name = 'BreakoutDeterministic-v4'
 # Get the environment and extract the number of actions.
-env = gym.make(args.env_name)
+env = gym.make(env_name)
 np.random.seed(123)
 env.seed(123)
 nb_actions = env.action_space.n
@@ -75,20 +76,21 @@ hstate_size = int(np.prod(conv3.shape[1:]))
 
 # Model learner network
 USE_LSTM = False
-sequence_length = 5 if USE_LSTM else 1
+sequence_length = 10 if USE_LSTM else 1
 action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
 action_in = Input(shape=action_shape, name='action_input')
 enc_state = Input(shape=(sequence_length, hstate_size), name='enc_state')
+layer_width = 8192
 if USE_LSTM:
     action_in_reshape = Reshape((sequence_length, 1))(action_in)
     enc_state_and_action = concatenate([enc_state, action_in_reshape], name='encoded_state_and_action')
-    lstm_out = LSTM(4096, activation='relu')(enc_state_and_action)
+    lstm_out = LSTM(layer_width, activation='relu')(enc_state_and_action)
 else:
     action_in_flat = Flatten(name='flat_act')(action_in)
     enc_state_flat = Flatten(name='flat_state')(enc_state)
     enc_state_and_action = concatenate([enc_state_flat, action_in_flat], name='encoded_state_and_action')
-    dense_out = Dense(8192, activation='relu')(enc_state_and_action)
-    dense_out = Dense(4096, activation='relu')(dense_out)
+    dense_out = Dense(layer_width, activation='relu')(enc_state_and_action)
+    dense_out = Dense(layer_width, activation='relu')(dense_out)
     lstm_out = Dense(4096, activation='relu')(dense_out)
 
 state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
@@ -96,8 +98,10 @@ reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
 terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(lstm_out)
 ml_model = Model(inputs=[enc_state, action_in], outputs=[state_pred, reward_pred, terminal_pred])
 ml_model.compile('adam', loss={'predicted_next_state': 'mse', 'predicted_reward': 'mse',
-                               'predicted_terminal': 'binary_crossentropy'}, metrics=['accuracy'])
+                               'predicted_terminal': 'binary_crossentropy'}, metrics=['mse', 'mae', 'mape'])
 print(ml_model.summary())
+
+log_string = '_{}_slen{}_lwidth{}-{}'.format(env_name, sequence_length, layer_width, time.time())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
@@ -128,9 +132,9 @@ dqn.compile(Adam(lr=.00025), metrics=['mae'])
 def train():
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
     # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
-    weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
-    checkpoint_weights_filename = 'dqn_' + args.env_name + '_weights_{step}.h5f'
-    log_filename = 'dqn_{}_log.json'.format(args.env_name)
+    weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
+    checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
+    log_filename = 'dqn_{}_log.json'.format(env_name)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
     callbacks += [FileLogger(log_filename, interval=100)]
     dqn.fit(env, callbacks=callbacks, nb_steps=nb_steps_dqn_fit, log_interval=10000)
@@ -156,8 +160,13 @@ def train():
 
         for jj in range(batch_size):
             # check for terminals
-            start = random.randrange(data_size - sequence_length)
-            experiences = dqn.memory.sample(sequence_length, range(start, start + sequence_length))
+            start = random.randrange(dqn.memory.window_length + 1, data_size - sequence_length)
+            batch_idxs = range(start, start + sequence_length)
+            if np.min(batch_idxs) >= dqn.memory.window_length + 1:
+                experiences = dqn.memory.sample(sequence_length, batch_idxs)
+            else:
+                print('FAIL')
+
             while np.array([e.terminal1 for e in experiences]).any():
                 if start is 0:
                     start = random.randrange(data_size - sequence_length)
@@ -195,13 +204,20 @@ def train():
             rewards[jj, ...] = reward_seq[np.newaxis, -1]
             terminals[jj, ...] = terminal1_seq[np.newaxis, -1]
 
-        ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], verbose=1, epochs=4,
-                     callbacks=[TensorBoard(log_dir='./logs/TlearnBIG')])  # , shuffle=False)
+        with open("OutputAtariDataStats.txt", "w") as text_file:
+            print("Var: {}".format(np.var(next_hstate)), file=text_file)
+            print("Min: {}".format(np.mean(np.min(next_hstate,axis=0))), file=text_file)
+            print("Max: {}".format(np.mean(np.max(next_hstate,axis=0))), file=text_file)
+            print("Min: {}".format(np.min(next_hstate,axis=0)), file=text_file)
+            print("Max: {}".format(np.max(next_hstate,axis=0)), file=text_file)
 
+        ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], verbose=1, epochs=ml_model_epochs,
+                     callbacks=[TensorBoard(log_dir='./logs/Tlearn'.format(log_string))])  # , shuffle=False)
+    return model_truncated
     # #######################################################################################################################
 
 
-def dyna_train():
+def dyna_train(model_truncated):
     from collections import deque
 
     class SynthEnv():
@@ -271,12 +287,17 @@ def dyna_train():
                     target_model_update=target_model_update_dqn_agent,
                     train_interval=4, delta_clip=1.)
     dqn2.compile(Adam(lr=.00025), metrics=['mae'])
-    dqn2.fit(env2, callbacks=callbacks, nb_steps=nb_steps_dqn_fit, log_interval=10000)
-
+    weights_filename = 'dyna_dqn_{}_weights.h5f'.format(env_name)
+    checkpoint_weights_filename = 'dyna_dqn_' + env_name + '_weights_{step}.h5f'
+    log_filename = 'dyna_dqn_{}_log.json'.format(env_name)
+    dyna_callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
+    dyna_callbacks += [FileLogger(log_filename, interval=100)]
+    dqn2.fit(env2, callbacks=dyna_callbacks, nb_steps=nb_steps_dqn_fit, log_interval=10000)
+    return dqn2
     # #######################################################################################################################
 
 
-def validate():
+def validate(model_truncated, dqn2):
     image_in = Input(shape=input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
@@ -307,13 +328,11 @@ def validate():
     dqn3.compile(Adam(lr=.00025), metrics=['mae'])
     dqn.test(env, nb_episodes=10, visualize=False)
     dqn3.test(env, nb_episodes=10, visualize=False)
-
-
 # #######################################################################################################################
 
 
 def test():
-    weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
+    weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
     if args.weights:
         weights_filename = args.weights
     dqn.load_weights(weights_filename)
@@ -322,8 +341,8 @@ def test():
 
 if __name__ == "__main__":
     if args.mode == 'train':
-        train()
-        dyna_train()
-        validate()
+        model_truncated = train()
+        dqn2 = dyna_train(model_truncated)
+        validate(model_truncated, dqn2)
     elif args.mode == 'test':
         test()
