@@ -12,14 +12,15 @@ import numpy as np
 class ModelLearner(LoggingModelLearner):
     def __init__(self, environment, agent_id, action_size,
                  mem_size=3000, epochs=4, learning_rate=.001,
-                 sequence_length=0, write_tboard=True, envname=None):
+                 sequence_length=0, write_tboard=True, envname=None, use_shallow=False):
         super().__init__(environment, sequence_length,
                          write_tboard=write_tboard,
                          out_dir_add=
-                         'agentID{}{}'.format(
+                         'agentID{}{}{}'.format(
                              agent_id,
-                             '_scenario_{}'.format(envname) if envname is not None else ''))
-
+                             '_scenario_{}'.format(envname) if envname is not None else '',
+                             '_netDepth{}'.format(1 if use_shallow else 2)))
+        self.use_shallow = use_shallow
         self.learning_rate = learning_rate
         self.net_train_epochs = epochs
         self.mem_size = mem_size
@@ -39,22 +40,24 @@ class ModelLearner(LoggingModelLearner):
         self.tmodel = build_models.build_regression_model(
             input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
             output_dim=self.env.observation_space[self.agent_id].shape[0],
-            recurrent=self.useRNN)
+            recurrent=self.useRNN,
+            dim_multipliers=(128,) if self.use_shallow else (64, 32))
 
         self.rmodel = build_models.build_regression_model(
             input_dim=self.env.observation_space[self.agent_id].shape[0],
             output_dim=1,
             recurrent=self.useRNN,
+            dim_multipliers=(128,) if self.use_shallow else (64, 32)
             # activations=('relu', 'relu')
         )
         # used to predict the locations of a landmarks based on movement and reward sequence
         self.dmodel = build_models.build_regression_model(
             input_dim=2 + 1,
             output_dim=self.env.observation_space[self.agent_id].shape[0] - 2,
-            # dim_multipliers=(320, 160),
-            recurrent=self.useRNN)
+            recurrent=self.useRNN,
+            dim_multipliers=(128,) if self.use_shallow else (64, 32))
 
-        self.models = [self.tmodel]
+        self.models = [self.tmodel, self.rmodel, self.dmodel]
         self.save_model_config()
 
     def get_action(self, obs_n):
@@ -114,7 +117,7 @@ class ModelLearner(LoggingModelLearner):
                                       validation_split=0.1,
                                       callbacks=self.Ttensorboard,
                                       verbose=1)
-            sk_eval(self.tmodel, input_data, train_signal, 'tmodel_R2.txt'.format(self.out_dir))
+            sk_eval(self.tmodel, input_data, train_signal, '{}/tmodel_R2.txt'.format(self.out_dir))
 
         if True:  # predicting rewards from observations
             if self.useRNN:
@@ -132,7 +135,7 @@ class ModelLearner(LoggingModelLearner):
                                       validation_split=0.1,
                                       callbacks=self.Rtensorboard,
                                       verbose=1)
-            sk_eval(self.rmodel, input_data, train_signal, 'rmodel_R2.txt'.format(self.out_dir))
+            sk_eval(self.rmodel, input_data, train_signal, '{}/rmodel_R2.txt'.format(self.out_dir))
 
             # DEBUG
             if False:
@@ -164,27 +167,21 @@ class ModelLearner(LoggingModelLearner):
                 train_signal = np.array(self.ent_pos_memory)
 
             history = self.dmodel.fit(input_data,
-                                      train_signal,  # Var = 1.5
+                                      train_signal,
                                       batch_size=minibatch_size,
                                       epochs=self.net_train_epochs,
                                       validation_split=0.1,
-                                      callbacks=self.Rtensorboard,
+                                      callbacks=self.Dtensorboard,
                                       verbose=1)
 
-            sk_eval(self.dmodel, input_data, train_signal, 'dmodel_R2.txt'.format(self.out_dir))
-
-        # NRMSE
-        denom = np.array(self.reward_memory).max() - np.array(self.reward_memory).min()
-
-        # COD
-        # denom =
+            sk_eval(self.dmodel, input_data, train_signal, '{}/dmodel_R2.txt'.format(self.out_dir))
 
         self.save()
 
 
 class MultiAgentModelLearner(LoggingModelLearner):
     def __init__(self, environment, mem_size=3000, epochs=4, learning_rate=.001,
-                 sequence_length=0, write_tboard=True, scenario_name=None):
+                 sequence_length=0, write_tboard=True, scenario_name=None, use_shallow=False):
         super().__init__(environment, sequence_length,
                          write_tboard=write_tboard,
                          out_dir_add='scenario_name{}'.format(scenario_name) if scenario_name is not None else None)
@@ -215,7 +212,8 @@ class MultiAgentModelLearner(LoggingModelLearner):
                              learning_rate=learning_rate,
                              sequence_length=sequence_length,
                              write_tboard=write_tboard,
-                             envname=scenario_name))
+                             envname=scenario_name,
+                             use_shallow=use_shallow))
 
     # get action from model using random policy
     def get_action(self, obs_n):
@@ -291,14 +289,24 @@ class MultiAgentModelLearner(LoggingModelLearner):
 
 
 if __name__ == "__main__":
-    env_name = 'simple'
-    for env_name in ['simple', 'simple_spread', 'simple_push']:
+    if True:
+        s = 10
+        env_name = 'simple'
         env = make_env2.make_env(env_name)
-        for s in [0, 3, 10, 30, 100, 300]:
-            canary = MultiAgentModelLearner(env, scenario_name=env_name,
-                                            mem_size=10000 * (s + 1),
-                                            sequence_length=s,
-                                            epochs=100)
-            canary.run(rounds=1)
-
-    # print('MSE: {}'.format(canary.evaluate(env)))
+        canary = MultiAgentModelLearner(env, scenario_name=env_name,
+                                        mem_size=10000 * (s + 1),
+                                        sequence_length=s,
+                                        epochs=100,
+                                        use_shallow=True)
+        canary.run(rounds=1)
+    else:
+        for env_name in ['simple', 'simple_spread', 'simple_push']:
+            env = make_env2.make_env(env_name)
+            for s in [0, 3, 10, 100, 300]:
+                for sh in [True, False]:
+                    canary = MultiAgentModelLearner(env, scenario_name=env_name,
+                                                    mem_size=10000 * (s + 1),
+                                                    sequence_length=s,
+                                                    epochs=100,
+                                                    use_shallow=sh)
+                canary.run(rounds=1)

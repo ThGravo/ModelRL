@@ -2,8 +2,7 @@ def sk_eval(model, input_data, train_signal, outfile_name=None):
     from sklearn.metrics import r2_score
     text_file = open(outfile_name, "w") if outfile_name is not None else None
 
-    if outfile_name is not None:
-        print(model.summary(), file=text_file)
+    print(model.summary(), file=text_file)
 
     y_pred = model.predict(input_data)
     print('r2_score(uniform_average): '
