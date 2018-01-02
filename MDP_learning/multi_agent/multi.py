@@ -284,7 +284,7 @@ if __name__ == "__main__":
     env_name = 'simple'
     env = make_env2.make_env(env_name)
 
-    canary = MultiAgentModelLearner(env, mem_size=100000, sequence_length=1000, scenario_name=env_name, epochs=100)
+    canary = MultiAgentModelLearner(env, mem_size=100000, sequence_length=200, scenario_name=env_name, epochs=100)
     canary.run(rounds=1)
 
     # print('MSE: {}'.format(canary.evaluate(env)))
