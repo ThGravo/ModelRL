@@ -125,7 +125,7 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
                      metrics=['mse', 'mae', COD, NRMSE, Rsquared])
     print(ml_model.summary())
 
-    log_string = '_{}_slen{}_lwidth{}-{}'.format(env_name, sequence_length, layer_width, time.time())
+    log_string = '{}_slen{}_lwidth{}-{}'.format(env_name, sequence_length, layer_width, time.time())
 
     ########################################################################################################################
     model_truncated = Model(inputs=dqn.model.input, outputs=dqn.model.get_layer('flat_feat').output)
@@ -194,7 +194,7 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
             print("Max: {}".format(np.max(next_hstate, axis=0)), file=text_file)
 
         ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], validation_split=0.1, verbose=1,
-                     epochs=ml_model_epochs, callbacks=[TensorBoard(log_dir='./logs/Tlearn'.format(log_string))])
+                     epochs=ml_model_epochs, callbacks=[TensorBoard(log_dir='./dqn_logs/{}'.format(log_string))])
     return ml_model, model_truncated
     # #######################################################################################################################
 
