@@ -54,20 +54,19 @@ if args.list:
                     print(f)
                     print(event_acc.Tags())
 
-# es.run(args.logdir)
-
-multiplexer = es.create_multiplexer(args.logdir)
-print('Running in: '.format(args.logdir))
-for run_name, data in multiplexer.Runs().items():
-    for tag_name in data['tensors']:
-        accu = multiplexer.GetAccumulator(run_name)
-        if check(accu.path, args):
-            output_filename = '%s___%s.csv' % (es.munge_filename(run_name), es.munge_filename(tag_name))
-            path = accu.path.strip('..')
-            output_dir = '{}/{}'.format(args.outdir, '' if args.flat else path)
-            output_dir = os.path.normpath(output_dir)
-            output_filepath = os.path.join(output_dir, output_filename)
-            print("Exporting (run=%r, tag=%r) to %r..." % (run_name, tag_name, output_filepath))
-            if not args.dry:
-                es.mkdir_p(output_dir)
-                es.export_scalars(multiplexer, run_name, tag_name, output_filepath)
+else:
+    multiplexer = es.create_multiplexer(args.logdir)
+    print('Running in: '.format(args.logdir))
+    for run_name, data in multiplexer.Runs().items():
+        for tag_name in data['tensors']:
+            accu = multiplexer.GetAccumulator(run_name)
+            if check(accu.path, args):
+                output_filename = '%s___%s.csv' % (es.munge_filename(run_name), es.munge_filename(tag_name))
+                path = accu.path.strip('..')
+                output_dir = '{}/{}'.format(args.outdir, '' if args.flat else path)
+                output_dir = os.path.normpath(output_dir)
+                output_filepath = os.path.join(output_dir, output_filename)
+                print("Exporting (run=%r, tag=%r) to %r..." % (run_name, tag_name, output_filepath))
+                if not args.dry:
+                    es.mkdir_p(output_dir)
+                    es.export_scalars(multiplexer, run_name, tag_name, output_filepath)
