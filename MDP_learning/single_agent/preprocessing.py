@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.preprocessing import scale
+from sklearn.preprocessing import scale, MinMaxScaler
 from fancyimpute import MICE, KNN
 from copy import deepcopy
 
@@ -7,11 +7,13 @@ from copy import deepcopy
 def standardise_memory(memory, state_size, action_size):
     states = np.vstack((memory[:, :state_size], memory[:, - state_size - 1:-1]))
     actions = memory[:, state_size: state_size + action_size]
-    states_scaled = scale(states)
-    actions_scaled = scale(actions)
+    scaler = MinMaxScaler()
+    states_scaled = scaler.fit_transform(states)
+    actions_scaled = scaler.fit_transform(actions)
     memory[:, :state_size] = states_scaled[:len(memory), :state_size]
     memory[:, - state_size - 1:-1] = states_scaled[len(memory):, :state_size]
     memory[:, state_size: state_size + action_size] = actions_scaled
+
 
 def make_mem_partial_obs(memory, state_size, partial_obs_rate):
     masks_states = np.random.choice([np.nan, 1.0], size=(len(memory), state_size),
@@ -28,7 +30,7 @@ def make_mem_partial_obs(memory, state_size, partial_obs_rate):
 
 def impute_missing(memory, state_size, imputer):
     states = np.vstack((memory[:, :state_size], memory[:, - state_size - 1:-1]))
-    states_imputed = imputer().complete(states)
+    states_imputed = imputer(n_imputations=50).complete(states)
     memory[:, :state_size] = states_imputed[:len(memory), :state_size]
     memory[:, - state_size - 1:-1] = states_imputed[len(memory):, :state_size]
 
@@ -50,3 +52,4 @@ def setup_batch_for_RNN(batch, sequence_length, state_size, action_size):
     x_seq = np.resize(x_seq, (actual_size, sequence_length, state_size + action_size))
     y_seq = np.resize(y_seq, (actual_size, state_size))
     return x_seq, y_seq
+

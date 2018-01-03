@@ -38,7 +38,7 @@ def build_recurrent_regression_model(input_dim,
                        activation=activations[min(i + 1, len(activations) - 1)],
                        return_sequences=i is not num_hlayers - 2))
         # stacked LSTMs need to return a sequence
-    model.add(Dense(output_dim, activation='relu'))
+    model.add(Dense(output_dim, activation='linear'))
     model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', COD, NRMSE, Rsquared])
     model.summary()
     return model

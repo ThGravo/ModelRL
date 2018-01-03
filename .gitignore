@@ -6,3 +6,4 @@ __pycache__
 *.h5f
 *.json
 *.npy
+*.pickle
