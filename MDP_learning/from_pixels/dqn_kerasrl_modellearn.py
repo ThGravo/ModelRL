@@ -21,7 +21,7 @@ from MDP_learning.from_pixels.synth_env import SynthEnv
 
 INPUT_SHAPE = (84, 84)
 WINDOW_LENGTH = 4
-nb_steps_dqn_fit = 1234567  # 1750000
+nb_steps_dqn_fit = 1834567  # 1750000
 nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
 target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
 memory_limit = nb_steps_dqn_fit  # 1000000
@@ -36,6 +36,7 @@ parser.add_argument('--mode', choices=['train', 'test'], default='test')
 parser.add_argument('--env-name', type=str, default='SeaquestDeterministic-v4')
 parser.add_argument('--weights', type=str, default=None)
 args = parser.parse_args()
+print(args)
 
 env_name = args.env_name
 weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
@@ -288,6 +289,7 @@ if __name__ == "__main__":
         loadDQN(dqn_agent)
         while dqn_agent.memory.nb_entries < memory_limit:
             dqn_agent.test(env, nb_episodes=1, visualize=False, nb_max_episode_steps=nb_steps_dqn_fit)
+
     for seq_len in [1, 3, 10, 20]:
         for width in [512, 1024, 4096]:
             dynamics_model, dqn_convolutions = trainML(dqn_agent,
