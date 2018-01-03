@@ -1,6 +1,7 @@
 from keras.layers import Dense, LSTM, GRU
 from keras.optimizers import Adam
 from keras.models import Sequential
+from MDP_learning.helpers.custom_metrics import COD, NRMSE, Rsquared
 import keras as K
 import numpy as np
 
@@ -16,7 +17,7 @@ def build_regression_model(input_dim,
         model.add(Dense(1000,
                         activation=activations[min(i + 1, len(activations) - 1)]))
     model.add(Dense(output_dim, activation='linear'))
-    model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc', 'mape'])
+    model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', COD, NRMSE, Rsquared])
     model.summary()
     return model
 
@@ -38,7 +39,7 @@ def build_recurrent_regression_model(input_dim,
                        return_sequences=i is not num_hlayers - 2))
         # stacked LSTMs need to return a sequence
     model.add(Dense(output_dim, activation='relu'))
-    model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', 'acc', 'mape'])
+    model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', COD, NRMSE, Rsquared])
     model.summary()
     return model
 
