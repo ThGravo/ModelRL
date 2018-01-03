@@ -41,13 +41,13 @@ class ModelLearner(LoggingModelLearner):
             input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
             output_dim=self.env.observation_space[self.agent_id].shape[0],
             recurrent=self.useRNN,
-            dim_multipliers=(32,) if self.use_shallow else (16, 16))
+            dim_multipliers=(64,) if self.use_shallow else (32, 16))
 
         self.rmodel = build_models.build_regression_model(
             input_dim=self.env.observation_space[self.agent_id].shape[0],
             output_dim=1,
             recurrent=self.useRNN,
-            dim_multipliers=(32,) if self.use_shallow else (16, 16)
+            dim_multipliers=(64,) if self.use_shallow else (32, 16)
             # activations=('relu', 'relu')
         )
         # used to predict the locations of a landmarks based on movement and reward sequence
@@ -289,7 +289,7 @@ class MultiAgentModelLearner(LoggingModelLearner):
 
 
 if __name__ == "__main__":
-    if True:
+    if False:
         s = 10
         env_name = 'simple'
         env = make_env2.make_env(env_name)
@@ -297,15 +297,15 @@ if __name__ == "__main__":
                                         mem_size=10000 * (s + 1),
                                         sequence_length=s,
                                         epochs=100,
-                                        use_shallow=True)
+                                        use_shallow=False)
         canary.run(rounds=1)
     else:
-        for env_name in ['simple', 'simple_spread', 'simple_push']:
-            env = make_env2.make_env(env_name)
-            for s in [0, 3, 10, 100, 300]:
+        for s in [0, 3, 10, 100, 300]:
+            for env_name in ['simple', 'simple_spread', 'simple_push']:
+                env = make_env2.make_env(env_name)
                 for sh in [True, False]:
                     canary = MultiAgentModelLearner(env, scenario_name=env_name,
-                                                    mem_size=10000 * (s + 1),
+                                                    mem_size=100000 * (s + 1),
                                                     sequence_length=s,
                                                     epochs=100,
                                                     use_shallow=sh)
