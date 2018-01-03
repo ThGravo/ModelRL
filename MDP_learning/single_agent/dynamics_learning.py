@@ -96,7 +96,12 @@ class ModelLearner(LoggingModelLearner):
     def train_models(self, minibatch_size=512):
 
         memory_arr = np.array(self.memory)
-
+        
+        '''
+        put this code back if you want to corrupt
+        the agent's memory, and then run an imputation
+        on the corrupted memory
+        
         if self.partial_obs_rate > 0:
             # creating missing state feature values
             make_mem_partial_obs(memory_arr, self.state_size, self.partial_obs_rate)
@@ -106,7 +111,8 @@ class ModelLearner(LoggingModelLearner):
             print(np.isnan(memory_arr).sum() / memory_arr.size)
             # imputing missing values
             impute_missing(memory_arr, self.state_size, MICE)
-
+        '''
+        
         #normalizing the data values to [0,1]
         standardise_memory(memory_arr, self.state_size, self.action_size)
         batch_size = len(memory_arr)
