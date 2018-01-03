@@ -2,6 +2,7 @@ from __future__ import division
 import argparse
 import random
 import time
+import os
 import numpy as np
 import gym
 
@@ -35,13 +36,20 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mode', choices=['train', 'test'], default='test')
 parser.add_argument('--env-name', type=str, default='SeaquestDeterministic-v4')
 parser.add_argument('--weights', type=str, default=None)
+parser.add_argument('--width', type=int, default=1024)
 args = parser.parse_args()
 print(args)
 
+# saving
 env_name = args.env_name
 weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
 checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
 log_filename = 'dqn_{}_log.json'.format(env_name)
+
+# loading
+filename = 'dqn_{}_weights.h5f'.format(env_name)
+if args.weights:
+    filename = args.weights
 
 
 def setupDQN(nb_actions):
@@ -84,7 +92,7 @@ def setupDQN(nb_actions):
     return dqn, hstate_size
 
 
-def trainDQN(dqn):
+def trainDQN(env, dqn):
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
     # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
@@ -126,7 +134,7 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
     print(ml_model.summary())
 
     log_string = '{}_slen{}_lwidth{}-{}'.format(env_name, sequence_length, layer_width, time.time())
-
+    print('logging to {}'.format(log_string))
     ########################################################################################################################
     model_truncated = Model(inputs=dqn.model.input, outputs=dqn.model.get_layer('flat_feat').output)
     print(model_truncated.summary())
@@ -193,8 +201,9 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
             print("Min: {}".format(np.min(next_hstate, axis=0)), file=text_file)
             print("Max: {}".format(np.max(next_hstate, axis=0)), file=text_file)
 
-        ml_model.fit([hstates, actions], [next_hstate, rewards, terminals], validation_split=0.1, verbose=1,
-                     epochs=ml_model_epochs, callbacks=[TensorBoard(log_dir='./dqn_logs/{}'.format(log_string))])
+        ml_model.fit([hstates, actions], [next_hstate, rewards, terminals],
+                     validation_split=0.1, verbose=1, epochs=ml_model_epochs, callbacks=[
+                TensorBoard(log_dir='./dqn_logs/{}/{}'.format(os.path.splitext(filename)[0], log_string))])
     return ml_model, model_truncated
     # #######################################################################################################################
 
@@ -227,7 +236,7 @@ def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_si
     # #######################################################################################################################
 
 
-def validate(nb_actions, model_truncated, dqn, dqn2):
+def validate(env, nb_actions, model_truncated, dqn, dqn2):
     image_in = Input(shape=input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
@@ -263,9 +272,7 @@ def validate(nb_actions, model_truncated, dqn, dqn2):
 # #######################################################################################################################
 
 def loadDQN(dqn):
-    filename = 'dqn_{}_weights.h5f'.format(env_name)
-    if args.weights:
-        filename = args.weights
+    print('loading: {}'.format(filename))
     dqn.load_weights(filename)
 
 
@@ -273,10 +280,11 @@ if __name__ == "__main__":
 
     seq_len = 10
 
-    env = gym.make(env_name)
+    environment = gym.make(env_name)
+    print('Playing: {}'.format(environment))
     np.random.seed(123)
-    env.seed(123)
-    num_actions = env.action_space.n
+    environment.seed(123)
+    num_actions = environment.action_space.n
 
     # (gray-)scale
     processor = AtariProcessor(INPUT_SHAPE)
@@ -288,14 +296,15 @@ if __name__ == "__main__":
     elif args.mode == 'test':
         loadDQN(dqn_agent)
         while dqn_agent.memory.nb_entries < memory_limit:
-            dqn_agent.test(env, nb_episodes=1, visualize=False, nb_max_episode_steps=nb_steps_dqn_fit)
+            dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=nb_steps_dqn_fit)
 
+    width = args.width
+    print('Network width: {}'.format(width))
     for seq_len in [1, 3, 10, 20]:
-        for width in [512, 1024, 4096]:
-            dynamics_model, dqn_convolutions = trainML(dqn_agent,
-                                                       sequence_length=seq_len,
-                                                       hstate_size=hidden_state_size,
-                                                       layer_width=width)
+        dynamics_model, dqn_convolutions = trainML(dqn_agent,
+                                                   sequence_length=seq_len,
+                                                   hstate_size=hidden_state_size,
+                                                   layer_width=width)
 
     # dqn_agent2 = dyna_train(num_actions, dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
     # validate(num_actions, dqn_convolutions, dqn_agent, dqn_agent2)
