@@ -37,14 +37,13 @@ parser.add_argument('--env-name', type=str, default='SeaquestDeterministic-v4')
 parser.add_argument('--weights', type=str, default=None)
 args = parser.parse_args()
 
-# Get the environment and extract the number of actions.
 env_name = args.env_name
 weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
 checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
 log_filename = 'dqn_{}_log.json'.format(env_name)
 
 
-def setupDQN():
+def setupDQN(nb_actions):
     image_in = Input(shape=input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
@@ -98,7 +97,7 @@ def trainDQN(dqn):
     # dqn.test(env, nb_episodes=1, visualize=False)
 
 
-def trainML(dqn, sequence_length, hstate_size, layer_width=4096):
+def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
     # Model learner network
     action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
     action_in = Input(shape=action_shape, name='action_input')
@@ -199,7 +198,7 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=4096):
     # #######################################################################################################################
 
 
-def dyna_train(ml_model, model_truncated, sequence_length, hstate_size):
+def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_size):
     env2 = SynthEnv(ml_model, model_truncated, env, processor, sequence_length, WINDOW_LENGTH)
 
     hidden_in = Input(shape=(1, hstate_size), name='hidden_input')
@@ -227,7 +226,7 @@ def dyna_train(ml_model, model_truncated, sequence_length, hstate_size):
     # #######################################################################################################################
 
 
-def validate(model_truncated, dqn, dqn2):
+def validate(nb_actions, model_truncated, dqn, dqn2):
     image_in = Input(shape=input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
@@ -276,11 +275,11 @@ if __name__ == "__main__":
     env = gym.make(env_name)
     np.random.seed(123)
     env.seed(123)
-    nb_actions = env.action_space.n
+    num_actions = env.action_space.n
 
     # (gray-)scale
     processor = AtariProcessor(INPUT_SHAPE)
-    dqn_agent, hidden_state_size = setupDQN()
+    dqn_agent, hidden_state_size = setupDQN(num_actions)
 
     if args.mode == 'train':
         trainDQN(dqn_agent)
@@ -296,5 +295,5 @@ if __name__ == "__main__":
                                                        hstate_size=hidden_state_size,
                                                        layer_width=width)
 
-    # dqn_agent2 = dyna_train(dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
-    # validate(dqn_convolutions, dqn_agent, dqn_agent2)
+    # dqn_agent2 = dyna_train(num_actions, dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
+    # validate(num_actions, dqn_convolutions, dqn_agent, dqn_agent2)
