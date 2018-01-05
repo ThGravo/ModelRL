@@ -93,7 +93,7 @@ class ModelLearner(LoggingModelLearner):
                 state = next_state
 
     # defines the training process
-    def train_models(self, minibatch_size=512):
+    def train_models(self, minibatch_size=32, steps_per_epoch=None):
 
         memory_arr = np.array(self.memory)
         
@@ -114,9 +114,9 @@ class ModelLearner(LoggingModelLearner):
         '''
         
         #normalizing the data values to [0,1]
-        standardise_memory(memory_arr, self.state_size, self.action_size)
+        # already done outside standardise_memory(memory_arr, self.state_size, self.action_size)
         batch_size = len(memory_arr)
-        minibatch_size = min(minibatch_size, batch_size)
+        minibatch_size = None if minibatch_size is None else min(minibatch_size, batch_size)
 
         if self.useRNN:
             t_x, t_y = setup_batch_for_RNN(memory_arr, self.sequence_length, self.state_size, self.action_size)
@@ -129,7 +129,8 @@ class ModelLearner(LoggingModelLearner):
                         epochs=self.net_train_epochs,
                         validation_split=0.1,
                         callbacks=self.Ttensorboard,
-                        verbose=1)
+                        verbose=1,
+                        steps_per_epoch=steps_per_epoch)
         '''
         #This code can be used for reward and terminal state prediction.
         self.rmodel.fit(batch[:, :self.state_size],
