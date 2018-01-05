@@ -35,7 +35,7 @@ class ModelLearner(LoggingModelLearner):
         self.ent_pos_memory = deque(maxlen=mem_size)
 
         self.agent_id = agent_id
-        self.policy = MAPolicies.RandomPolicy(env, self.agent_id)
+        self.policy = MAPolicies.RandomPolicy(environment, self.agent_id)
 
         self.tmodel = build_models.build_regression_model(
             input_dim=self.env.observation_space[self.agent_id].shape[0] + action_size,
@@ -236,7 +236,7 @@ class MultiAgentModelLearner(LoggingModelLearner):
         for ll in self.local_learners:
             ll.clear_mem()
 
-        obs_n = env.reset()
+        obs_n = self.env.reset()
         for ii in range(self.mem_size):
             # query for action from each agent's policy
             act_n = self.get_action(obs_n)
@@ -263,7 +263,7 @@ class MultiAgentModelLearner(LoggingModelLearner):
             obs_n = obs_n_next
 
             if any(done_n):
-                obs_n = env.reset()
+                obs_n = self.env.reset()
 
             if self.render:
                 env.render()
