@@ -300,7 +300,7 @@ if __name__ == "__main__":
 
     width = args.width
     print('Network width: {}'.format(width))
-    for seq_len in [1, 3, 10, 20]:
+    for seq_len in [1, 3, 10, 20, 100]:
         dynamics_model, dqn_convolutions = trainML(dqn_agent,
                                                    sequence_length=seq_len,
                                                    hstate_size=hidden_state_size,
