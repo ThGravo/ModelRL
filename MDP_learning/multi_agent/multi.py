@@ -7,6 +7,7 @@ from MDP_learning.helpers.model_evaluation import sk_eval
 from collections import deque
 import random
 import numpy as np
+import time
 
 
 class ModelLearner(LoggingModelLearner):
@@ -83,16 +84,17 @@ class ModelLearner(LoggingModelLearner):
         array_size = input_batch.shape[0] - self.sequence_length
         actual_size = 0
 
-        seq = np.empty((array_size, self.sequence_length, input_batch.shape[1]))
-        output = np.empty((array_size, signal.shape[1]))
+        d = np.array(done)
+        seq = np.zeros((array_size, self.sequence_length, input_batch.shape[1]), dtype=np.float32)
+        output = np.zeros((array_size, signal.shape[1]), dtype=np.float32)
 
         for jj in range(1, array_size, max(1, self.sequence_length)):
-            if jj % 1000 == 1:
+            if jj % 10000 == 1:
                 print('Filling data for RNN: {} of {} ({} w/o terminals)'.format(jj, array_size, actual_size))
             # NO intermediate terminals
-            if not np.array(done)[jj:jj + self.sequence_length - 1, :].any():
-                seq[actual_size, ...] = input_batch[np.newaxis, jj:jj + self.sequence_length, :]
-                output[actual_size, ...] = signal[jj + self.sequence_length, :]
+            if not d[jj:jj + self.sequence_length - 1, :].any():
+                seq[actual_size, :, :] = input_batch[np.newaxis, jj:jj + self.sequence_length, :]
+                output[actual_size, :] = signal[jj + self.sequence_length, :]
                 actual_size += 1
 
         seq.resize((actual_size, self.sequence_length, input_batch.shape[1]))
@@ -100,12 +102,42 @@ class ModelLearner(LoggingModelLearner):
         print('Done filling the data!')
         return seq, output
 
+    # if this becomes a bottle-neck again this could be transformed into a parallel version
+    # from joblib import Parallel, delayed
+    # from joblib.pool import has_shareable_memory
+    # from numba import jit
+    def setup_batch_for_RNN2(self, input_batch, signal, done):
+        array_length = input_batch.shape[0] - self.sequence_length
+        actual_size = 0
+
+        d = np.array(done)
+        seq = np.zeros((array_length, self.sequence_length, input_batch.shape[1]), dtype=np.float32)
+        output = np.zeros((array_length, signal.shape[1]), dtype=np.float32)
+        mask = np.zeros(array_length, dtype=np.bool_)
+
+        for jj in range(1, array_length, max(1, self.sequence_length)):
+            if jj % 10000 == 1:
+                print('Filling data for RNN: {} of {} ({} w/o terminals)'.format(jj, array_length, actual_size))
+            # NO intermediate terminals
+            if not d[jj:jj + self.sequence_length - 1, :].any():
+                mask[jj] = True
+                seq[jj, :, :] = input_batch[np.newaxis, jj:jj + self.sequence_length, :]
+                output[jj, :] = signal[jj + self.sequence_length, :]
+                actual_size += 1
+
+        seq_out = seq[mask]
+        output_out = output[mask]
+        print('Done filling the data!')
+        return seq_out, output_out
+
     def train_models(self, minibatch_size=32):
         if True:  # predictiong state transitions
             if self.useRNN:
+                now = time.time()
                 input_data, train_signal = self.setup_batch_for_RNN(np.array(self.x_memory),
                                                                     np.array(self.next_obs_memory),
                                                                     done=self.done_memory)
+                print("setup_batch_for_RNN took: {}".format(time.time() - now))
             else:
                 input_data = np.array(self.x_memory)
                 train_signal = np.array(self.next_obs_memory)
@@ -300,7 +332,7 @@ if __name__ == "__main__":
                                         use_shallow=False)
         canary.run(rounds=1)
     else:
-        for s in [0, 3, 10, 100, 300]:
+        for s in [10, 100, 300]:
             for env_name in ['simple', 'simple_spread', 'simple_push']:
                 env = make_env2.make_env(env_name)
                 for sh in [True, False]:
