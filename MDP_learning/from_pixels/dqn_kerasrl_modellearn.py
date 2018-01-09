@@ -194,12 +194,13 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
             rewards[jj, ...] = reward_seq[np.newaxis, -1]
             terminals[jj, ...] = terminal1_seq[np.newaxis, -1]
 
-        with open("{}DataStats.txt".format(env_name), "w") as text_file:
-            print("Var: {}".format(np.var(next_hstate)), file=text_file)
-            print("Min: {}".format(np.mean(np.min(next_hstate, axis=0))), file=text_file)
-            print("Max: {}".format(np.mean(np.max(next_hstate, axis=0))), file=text_file)
-            print("Min: {}".format(np.min(next_hstate, axis=0)), file=text_file)
-            print("Max: {}".format(np.max(next_hstate, axis=0)), file=text_file)
+        if False:  # Debug
+            with open("{}DataStats.txt".format(env_name), "w") as text_file:
+                print("Var: {}".format(np.var(next_hstate)), file=text_file)
+                print("Min: {}".format(np.mean(np.min(next_hstate, axis=0))), file=text_file)
+                print("Max: {}".format(np.mean(np.max(next_hstate, axis=0))), file=text_file)
+                print("Min: {}".format(np.min(next_hstate, axis=0)), file=text_file)
+                print("Max: {}".format(np.max(next_hstate, axis=0)), file=text_file)
 
         ml_model.fit([hstates, actions], [next_hstate, rewards, terminals],
                      validation_split=0.1, verbose=1, epochs=ml_model_epochs, callbacks=[
@@ -277,9 +278,6 @@ def loadDQN(dqn):
 
 
 if __name__ == "__main__":
-
-    seq_len = 10
-
     environment = gym.make(env_name)
     print('Playing: {}'.format(environment))
     np.random.seed(123)
@@ -298,13 +296,12 @@ if __name__ == "__main__":
         while dqn_agent.memory.nb_entries < memory_limit:
             dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=nb_steps_dqn_fit)
 
-    width = args.width
-    print('Network width: {}'.format(width))
+    print('Network width: {}'.format(args.width))
     for seq_len in [1, 3, 10, 20, 100]:
         dynamics_model, dqn_convolutions = trainML(dqn_agent,
                                                    sequence_length=seq_len,
                                                    hstate_size=hidden_state_size,
-                                                   layer_width=width)
+                                                   layer_width=args.width)
 
     # dqn_agent2 = dyna_train(num_actions, dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
     # validate(num_actions, dqn_convolutions, dqn_agent, dqn_agent2)
