@@ -332,13 +332,13 @@ if __name__ == "__main__":
                                         use_shallow=False)
         canary.run(rounds=1)
     else:
-        for s in [10, 100, 300]:
+        for s in [0, 3, 10, 100, 300]:
             for env_name in ['simple', 'simple_spread', 'simple_push']:
                 env = make_env2.make_env(env_name)
                 for sh in [True, False]:
                     canary = MultiAgentModelLearner(env, scenario_name=env_name,
                                                     mem_size=100000 * (s + 1),
                                                     sequence_length=s,
-                                                    epochs=100,
+                                                    epochs=300,
                                                     use_shallow=sh)
-                canary.run(rounds=1)
+                    canary.run(rounds=1)
