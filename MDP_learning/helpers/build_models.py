@@ -10,13 +10,22 @@ def build_regression_model(input_dim,
                            output_dim,
                            base_size=None,  # base_size for adaptive size
                            dim_multipliers=(32, 16),
-                           activations=('relu', 'sigmoid'),
+                           activations=None,
                            lr=.001,
+                           opt_decay=0,
+                           opt_clipnorm=0,
                            recurrent=False,
                            num_hlayers=None):
-    base_size = input_dim if base_size is None else base_size
-    num_hlayers = len(dim_multipliers) - 1 if num_hlayers is None else num_hlayers
+
+    if base_size is None:
+        base_size = input_dim
+    if num_hlayers is None:
+        num_hlayers = len(dim_multipliers) - 1
+    if activations is None:
+        activations = ('tanh',)
+
     model = Sequential()
+
     if recurrent:
         model.add(LSTM(base_size * dim_multipliers[0],
                        input_shape=(None, input_dim),
@@ -27,15 +36,19 @@ def build_regression_model(input_dim,
             model.add(LSTM(base_size * dim_multipliers[i + 1],
                            activation=activations[min(i + 1, len(activations) - 1)],
                            return_sequences=i is not num_hlayers - 1))
-        model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', COD, NRMSE, Rsquared])
     else:
         model.add(Dense(base_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
         for i in range(num_hlayers):
             model.add(Dense(base_size * dim_multipliers[i + 1],
                             activation=activations[min(i + 1, len(activations) - 1)]))
-        model.add(Dense(output_dim, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=lr), metrics=['mse', 'mae', COD, NRMSE, Rsquared])
+
+    model.add(Dense(output_dim, activation='linear'))
+
+    print("LRLRLRLR============ {}", lr)
+    model.compile(loss='mse',
+                  optimizer=Adam(lr=lr, decay=opt_decay, clipnorm=opt_clipnorm),
+                  metrics=['mse', 'mae', COD, NRMSE, Rsquared])
+
     model.summary()
     return model
 
@@ -50,11 +63,15 @@ def build_dmodel(input_dim,
                  num_hlayers=None):
     base_size = input_dim if base_size is None else base_size
     num_hlayers = len(dim_multipliers) - 1 if num_hlayers is None else num_hlayers
+
     model = Sequential()
     model.add(Dense(base_size * dim_multipliers[0], input_dim=input_dim, activation=activations[0]))
+
     for i in range(num_hlayers):
         model.add(Dense(base_size * dim_multipliers[i + 1], activation=activations[i + 1]))
+
     model.add(Dense(1, activation='sigmoid'))
     model.compile(loss='binary_crossentropy', optimizer=Adam(lr=lr), metrics=['accuracy'])
     model.summary()
+
     return model
