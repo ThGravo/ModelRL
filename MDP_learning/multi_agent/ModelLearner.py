@@ -41,7 +41,7 @@ class ModelLearner(LoggingModelLearner):
         self.agent_id = agent_id
         self.policy = MAPolicies.RandomPolicy(environment, self.agent_id)
 
-        dim_mult = tuple([int(128 / net_depth) + 1 for _ in range(net_depth)])
+        dim_mult = tuple([int(256 / net_depth) + 1 for _ in range(net_depth)])
 
         if self.learn_transitions:
             self.tmodel = build_models.build_regression_model(
@@ -77,9 +77,9 @@ class ModelLearner(LoggingModelLearner):
                 recurrent=self.useRNN,
                 dim_multipliers=dim_mult,
                 lr=learning_rate,
-                activations=('relu', 'relu'),
-                opt_decay=0.01,
-                opt_clipnorm=1.0,
+                # activations=('relu', 'relu'),
+                # opt_decay=0.01,
+                # opt_clipnorm=1.0,
                 num_hlayers=net_depth - 1)
             self.models.append(self.dmodel)
 
@@ -127,8 +127,8 @@ class ModelLearner(LoggingModelLearner):
         output = np.zeros((array_size, signal.shape[1]), dtype=np.float32)
 
         for jj in range(1, array_size, max(1, self.sequence_length)):
-            if jj % 10000 == 1:
-                print('Filling data for RNN: {} of {} ({} w/o terminals)'.format(jj, array_size, actual_size))
+            # if jj % 10000 == 1:
+            #     print('Filling data for RNN: {} of {} ({} w/o terminals)'.format(jj, array_size, actual_size))
             # NO intermediate terminals
             if not d[jj:jj + self.sequence_length - 1, :].any():
                 seq[actual_size, :, :] = input_batch[np.newaxis, jj:jj + self.sequence_length, :]
