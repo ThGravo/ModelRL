@@ -16,6 +16,9 @@ def build_regression_model(input_dim,
                            opt_clipnorm=0,
                            recurrent=False,
                            num_hlayers=None):
+    print(
+        "Building regression model dimMulti {} actiFuncs {} LR {} decay {} clipNorm {} recurrent {} numHiddenlayers{}".format(
+            dim_multipliers, activations, lr, opt_decay, opt_clipnorm, recurrent, num_hlayers))
 
     if base_size is None:
         base_size = input_dim
@@ -44,7 +47,6 @@ def build_regression_model(input_dim,
 
     model.add(Dense(output_dim, activation='linear'))
 
-    print("LRLRLRLR============ {}", lr)
     model.compile(loss='mse',
                   optimizer=Adam(lr=lr, decay=opt_decay, clipnorm=opt_clipnorm),
                   metrics=['mse', 'mae', COD, NRMSE, Rsquared])

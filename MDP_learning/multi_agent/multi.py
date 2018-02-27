@@ -133,6 +133,7 @@ if __name__ == "__main__":
             for s in [100, 30, 0, 3, 10]:
                 env = make_env2.make_env(env_name)
                 for nd in [2, 3, 1]:
+                    print('Running Env {} with Seqlen {} and NetDepth {}'.format(env_name, s, nd))
                     canary = MultiAgentModelLearner(env, scenario_name=env_name,
                                                     mem_size=300000 * (s + 1),
                                                     sequence_length=s,
