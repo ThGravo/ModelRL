@@ -20,41 +20,44 @@ from MDP_learning.helpers.custom_metrics import COD, NRMSE, Rsquared
 from MDP_learning.from_pixels.atari_preprocessor import AtariProcessor
 from MDP_learning.from_pixels.synth_env import SynthEnv
 
-INPUT_SHAPE = (84, 84)
-WINDOW_LENGTH = 4
-nb_steps_dqn_fit = 1834567  # 1750000
-nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
-target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
-memory_limit = nb_steps_dqn_fit  # 1000000
-nb_steps_annealed_policy = int(nb_steps_dqn_fit / 2)  # 1000000
-ml_model_epochs = 30
 
-# Next, we build our model. We use the same model that was described by Mnih et al. (2015).
-input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
-parser = argparse.ArgumentParser()
+class AtariConfig:
+    INPUT_SHAPE = (84, 84)
+    WINDOW_LENGTH = 4
+    nb_steps_dqn_fit = 1834567  # 1750000
+    nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
+    target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
+    memory_limit = nb_steps_dqn_fit  # 1000000
+    nb_steps_annealed_policy = int(nb_steps_dqn_fit / 2)  # 1000000
+    ml_model_epochs = 30
 
-parser.add_argument('--mode', choices=['train', 'test'], default='test')
-parser.add_argument('--env-name', type=str, default='SeaquestDeterministic-v4')
-parser.add_argument('--weights', type=str, default=None)
-parser.add_argument('--width', type=int, default=1024)
-args = parser.parse_args()
-print(args)
+    # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
+    input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
+    parser = argparse.ArgumentParser()
 
-# saving
-env_name = args.env_name
-weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
-checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
-log_filename = 'dqn_{}_log.json'.format(env_name)
+    parser.add_argument('--mode', choices=['train', 'test'], default='test')
+    parser.add_argument('--env-name', type=str, default='SeaquestDeterministic-v4')
+    parser.add_argument('--weights', type=str, default=None)
+    parser.add_argument('--width', type=int, default=1024)
+    args = parser.parse_args()
+    print(args)
 
-# loading
-filename = 'dqn_{}_weights.h5f'.format(env_name)
-if args.weights:
-    filename = args.weights
+    # saving
+    env_name = args.env_name
+    weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
+    checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
+    log_filename = 'dqn_{}_log.json'.format(env_name)
+
+    # loading
+    filename = 'dqn_{}_weights.h5f'.format(env_name)
+    if args.weights:
+        filename = args.weights
 
 
-def setupDQN(nb_actions):
-    image_in = Input(shape=input_shape, name='main_input')
-    input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
+def setupDQN(nb_actions, processor):
+    cfg = AtariConfig
+    image_in = Input(shape=cfg.input_shape, name='main_input')
+    input_perm = Permute((2, 3, 1), input_shape=cfg.input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
     conv2 = Conv2D(64, (4, 4), activation="relu", strides=(2, 2))(conv1)
     conv3 = Conv2D(64, (3, 3), activation="relu", strides=(1, 1))(conv2)
@@ -67,7 +70,7 @@ def setupDQN(nb_actions):
 
     # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
     # even the metrics!
-    memory = SequentialMemory(limit=memory_limit, window_length=WINDOW_LENGTH)
+    memory = SequentialMemory(limit=cfg.memory_limit, window_length=cfg.WINDOW_LENGTH)
 
     # Select a policy. We use eps-greedy action selection, which means that a random action is selected
     # with probability eps. We anneal eps from 1.0 to 0.1 over the course of 1M steps. This is done so that
@@ -75,7 +78,7 @@ def setupDQN(nb_actions):
     # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
     # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
     policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                                  nb_steps=nb_steps_annealed_policy)
+                                  nb_steps=cfg.nb_steps_annealed_policy)
 
     # The trade-off between exploration and exploitation is difficult and an on-going research topic.
     # If you want, you can experiment with the parameters or use a different policy. Another popular one
@@ -84,8 +87,8 @@ def setupDQN(nb_actions):
     # Feel free to give it a try!
 
     dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
-                   processor=processor, nb_steps_warmup=nb_steps_warmup_dqn_agent, gamma=.99,
-                   target_model_update=target_model_update_dqn_agent,
+                   processor=processor, nb_steps_warmup=cfg.nb_steps_warmup_dqn_agent, gamma=.99,
+                   target_model_update=cfg.target_model_update_dqn_agent,
                    train_interval=4, delta_clip=1.)
     dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
@@ -93,20 +96,22 @@ def setupDQN(nb_actions):
 
 
 def trainDQN(env, dqn):
+    cfg = AtariConfig
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
     # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
-    callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
-    callbacks += [FileLogger(log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=nb_steps_dqn_fit, log_interval=10000)
+    callbacks = [ModelIntervalCheckpoint(cfg.checkpoint_weights_filename, interval=250000)]
+    callbacks += [FileLogger(cfg.log_filename, interval=100)]
+    dqn.fit(env, callbacks=callbacks, nb_steps=cfg.nb_steps_dqn_fit, log_interval=10000)
 
     # After training is done, we save the final weights one more time.
-    dqn.save_weights(weights_filename, overwrite=True)
+    dqn.save_weights(cfg.weights_filename, overwrite=True)
 
     # Finally, evaluate our algorithm for 10 episodes.
     # dqn.test(env, nb_episodes=1, visualize=False)
 
 
 def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
+    cfg = AtariConfig
     # Model learner network
     action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
     action_in = Input(shape=action_shape, name='action_input')
@@ -133,7 +138,7 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
                      metrics=['mse', 'mae', COD, NRMSE, Rsquared])
     print(ml_model.summary())
 
-    log_string = '{}_slen{}_lwidth{}-{}'.format(env_name, sequence_length, layer_width, time.time())
+    log_string = '{}_slen{}_lwidth{}-{}'.format(cfg.env_name, sequence_length, layer_width, time.time())
     print('logging to {}'.format(log_string))
     ########################################################################################################################
     model_truncated = Model(inputs=dqn.model.input, outputs=dqn.model.get_layer('flat_feat').output)
@@ -195,7 +200,7 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
             terminals[jj, ...] = terminal1_seq[np.newaxis, -1]
 
         if False:  # Debug
-            with open("{}DataStats.txt".format(env_name), "w") as text_file:
+            with open("{}DataStats.txt".format(cfg.env_name), "w") as text_file:
                 print("Var: {}".format(np.var(next_hstate)), file=text_file)
                 print("Min: {}".format(np.mean(np.min(next_hstate, axis=0))), file=text_file)
                 print("Max: {}".format(np.mean(np.max(next_hstate, axis=0))), file=text_file)
@@ -203,14 +208,15 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
                 print("Max: {}".format(np.max(next_hstate, axis=0)), file=text_file)
 
         ml_model.fit([hstates, actions], [next_hstate, rewards, terminals],
-                     validation_split=0.1, verbose=1, epochs=ml_model_epochs, callbacks=[
-                TensorBoard(log_dir='./dqn_logs/{}/{}'.format(os.path.splitext(filename)[0], log_string))])
+                     validation_split=0.1, verbose=1, epochs=cfg.ml_model_epochs, callbacks=[
+                TensorBoard(log_dir='./dqn_logs/{}/{}'.format(os.path.splitext(cfg.filename)[0], log_string))])
     return ml_model, model_truncated
     # #######################################################################################################################
 
 
-def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_size):
-    env2 = SynthEnv(ml_model, model_truncated, env, processor, sequence_length, WINDOW_LENGTH)
+def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_size, processor):
+    cfg = AtariConfig
+    env2 = SynthEnv(ml_model, model_truncated, cfg.env, processor, sequence_length, cfg.WINDOW_LENGTH)
 
     hidden_in = Input(shape=(1, hstate_size), name='hidden_input')
     hidden_in_f = Flatten(name='flat_hidden')(hidden_in)
@@ -219,12 +225,12 @@ def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_si
     model2 = Model(inputs=[hidden_in], outputs=[q_out])
     print(model2.summary())
 
-    memory2 = SequentialMemory(limit=memory_limit, window_length=1)
+    memory2 = SequentialMemory(limit=cfg.memory_limit, window_length=1)
     policy2 = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                                   nb_steps=nb_steps_annealed_policy)
+                                   nb_steps=cfg.nb_steps_annealed_policy)
     dqn2 = DQNAgent(model=model2, nb_actions=nb_actions, policy=policy2, memory=memory2,
-                    nb_steps_warmup=nb_steps_warmup_dqn_agent, gamma=.99,
-                    target_model_update=target_model_update_dqn_agent,
+                    nb_steps_warmup=cfg.nb_steps_warmup_dqn_agent, gamma=.99,
+                    target_model_update=cfg.target_model_update_dqn_agent,
                     train_interval=4, delta_clip=1.)
     dqn2.compile(Adam(lr=.00025), metrics=['mae'])
     '''dyna_weights_filename = 'dyna_dqn_{}_weights.h5f'.format(env_name)
@@ -232,14 +238,15 @@ def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_si
     dyna_log_filename = 'dyna_dqn_{}_log.json'.format(env_name)
     dyna_callbacks = [ModelIntervalCheckpoint(dyna_checkpoint_weights_filename, interval=250000)]
     dyna_callbacks += [FileLogger(dyna_log_filename, interval=100)]'''
-    dqn2.fit(env2, nb_steps=nb_steps_dqn_fit, log_interval=10000)  # callbacks=dyna_callbacks,
+    dqn2.fit(env2, nb_steps=cfg.nb_steps_dqn_fit, log_interval=10000)  # callbacks=dyna_callbacks,
     return dqn2
     # #######################################################################################################################
 
 
 def validate(env, nb_actions, model_truncated, dqn, dqn2):
-    image_in = Input(shape=input_shape, name='main_input')
-    input_perm = Permute((2, 3, 1), input_shape=input_shape)(image_in)
+    cfg = AtariConfig
+    image_in = Input(shape=cfg.input_shape, name='main_input')
+    input_perm = Permute((2, 3, 1), input_shape=cfg.input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
     conv2 = Conv2D(64, (4, 4), activation="relu", strides=(2, 2))(conv1)
     conv3 = Conv2D(64, (3, 3), activation="relu", strides=(1, 1))(conv2)
@@ -258,12 +265,12 @@ def validate(env, nb_actions, model_truncated, dqn, dqn2):
     model3.set_weights(wghts)
     print(model3.summary())
 
-    memory3 = SequentialMemory(limit=memory_limit, window_length=WINDOW_LENGTH)
+    memory3 = SequentialMemory(limit=cfg.memory_limit, window_length=cfg.WINDOW_LENGTH)
     policy3 = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                                   nb_steps=nb_steps_annealed_policy)
+                                   nb_steps=cfg.nb_steps_annealed_policy)
     dqn3 = DQNAgent(model=model3, nb_actions=nb_actions, policy=policy3, memory=memory3,
-                    processor=processor, nb_steps_warmup=nb_steps_warmup_dqn_agent, gamma=.99,
-                    target_model_update=target_model_update_dqn_agent,
+                    processor=processor, nb_steps_warmup=cfg.nb_steps_warmup_dqn_agent, gamma=.99,
+                    target_model_update=cfg.target_model_update_dqn_agent,
                     train_interval=4, delta_clip=1.)
     dqn3.compile(Adam(lr=.00025), metrics=['mae'])
     dqn.test(env, nb_episodes=10, visualize=False)
@@ -273,35 +280,37 @@ def validate(env, nb_actions, model_truncated, dqn, dqn2):
 # #######################################################################################################################
 
 def loadDQN(dqn):
-    print('loading: {}'.format(filename))
-    dqn.load_weights(filename)
+    cfg = AtariConfig
+    print('loading: {}'.format(cfg.filename))
+    dqn.load_weights(cfg.filename)
 
 
 if __name__ == "__main__":
-    environment = gym.make(env_name)
+    cfg = AtariConfig
+    environment = gym.make(cfg.env_name)
     print('Playing: {}'.format(environment))
     np.random.seed(123)
     environment.seed(123)
     num_actions = environment.action_space.n
 
     # (gray-)scale
-    processor = AtariProcessor(INPUT_SHAPE)
-    dqn_agent, hidden_state_size = setupDQN(num_actions)
+    processor = AtariProcessor(cfg.INPUT_SHAPE)
+    dqn_agent, hidden_state_size = setupDQN(num_actions, processor)
 
-    if args.mode == 'train':
-        trainDQN(dqn_agent)
+    if cfg.args.mode == 'train':
+        trainDQN(environment, dqn_agent)
 
-    elif args.mode == 'test':
+    elif cfg.args.mode == 'test':
         loadDQN(dqn_agent)
-        while dqn_agent.memory.nb_entries < memory_limit:
-            dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=nb_steps_dqn_fit)
+        while dqn_agent.memory.nb_entries < cfg.memory_limit:
+            dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=cfg.nb_steps_dqn_fit)
 
-    print('Network width: {}'.format(args.width))
+    print('Network width: {}'.format(cfg.args.width))
     for seq_len in [1, 3, 10, 20, 100]:
         dynamics_model, dqn_convolutions = trainML(dqn_agent,
                                                    sequence_length=seq_len,
                                                    hstate_size=hidden_state_size,
-                                                   layer_width=args.width)
+                                                   layer_width=cfg.args.width)
 
     # dqn_agent2 = dyna_train(num_actions, dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
     # validate(num_actions, dqn_convolutions, dqn_agent, dqn_agent2)
