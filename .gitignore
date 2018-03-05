@@ -7,3 +7,8 @@ __pycache__
 *.json
 *.npy
 *.pickle
+*.txt
+MDP_learning/.ipynb_checkpoints/
+MDP_learning/helpers/MUJOCO_LOG.TXT
+MDP_learning/multi_agent/out/
+MDP_learning/out/
