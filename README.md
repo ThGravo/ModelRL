@@ -16,5 +16,10 @@ The dynamics of a video games, at the lowest level, are given by the squence of 
 ### Independent learning in multi-agent domains
 In this setting, each agent can independently learn a model of the dynamics of the environment; the agent aims to predict its next observation given only its local observation and chosen action. The observations are the relative distances of objects or other agents in the environment. The task is to predict a successor postions given a sequence of relative distances as the agent moves around in the evironment.
 
-## Results
-Please run "MDP_learning.ipynb" and grab a cup of tea... It might take a while. ;)
+## Getting Started
+Either run 'MDP_learning.ipynb' or run
+* 'MDP_learning/single_agent/dynamics_learning.py' for POMDP learning
+* 'MDP_learning/from_pixels/dqn_kerasrl_modellearn.py' for CNN filter response prediction
+* 'MDP_learning/multi_agent/multi.py' for the multi agent setting
+
+And grab a cup of tea... It might take a while.
