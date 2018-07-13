@@ -34,6 +34,7 @@ The multi-agent environments [1] feature a continuous observation and a discrete
 * **Simple**: Single agent sees landmark position, rewarded based on how close it gets to landmark.
 * **Push**: 1 agent, 1 adversary, 1 landmark. Agent is rewarded based on distance to landmark. Adversary is rewarded if it is close to the landmark, and if the agent is far from the landmark. So the adversary learns to push agent away from the landmark.
 * **Spread**: N agents, N landmarks. Agents are rewarded based on how far any agent is from each landmark. Agents are penalized if they collide with other agents. So, agents have to learn to cover all the landmarks while avoiding collisions.
+![Multi-agent environment training](multi.jpg?raw=true "Multi-agent training")
 
 ## Running the code
 Either run `MDP_learning.ipynb` or run
