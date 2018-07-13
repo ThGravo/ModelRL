@@ -22,40 +22,32 @@ from MDP_learning.from_pixels.synth_env import SynthEnv
 
 
 class AtariConfig:
-    INPUT_SHAPE = (84, 84)
-    WINDOW_LENGTH = 4
-    nb_steps_dqn_fit = 1834567  # 1750000
-    nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 42 + 42  # 50000
-    target_model_update_dqn_agent = int(max(0, np.sqrt(nb_steps_dqn_fit))) * 8 + 8  # 10000
-    memory_limit = nb_steps_dqn_fit  # 1000000
-    nb_steps_annealed_policy = int(nb_steps_dqn_fit / 2)  # 1000000
-    ml_model_epochs = 30
+    def __init__(self, env_name='PongDeterministic-v4', weights=None):
+        self.INPUT_SHAPE = (84, 84)
+        self.WINDOW_LENGTH = 4
+        self.nb_steps_dqn_fit = 1834567  # 1750000
+        self.nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(self.nb_steps_dqn_fit))) * 42 + 42  # 50000
+        self.target_model_update_dqn_agent = int(max(0, np.sqrt(self.nb_steps_dqn_fit))) * 8 + 8  # 10000
+        self.memory_limit = int(self.nb_steps_dqn_fit/2)  # 1000000
+        self.nb_steps_annealed_policy = int(self.nb_steps_dqn_fit / 2)  # 1000000
+        self.ml_model_epochs = 30
 
-    # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
-    input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
-    parser = argparse.ArgumentParser()
+        # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
+        self.input_shape = (self.WINDOW_LENGTH,) + self.INPUT_SHAPE
 
-    parser.add_argument('--mode', choices=['train', 'test'], default='test')
-    parser.add_argument('--env-name', type=str, default='SeaquestDeterministic-v4')
-    parser.add_argument('--weights', type=str, default=None)
-    parser.add_argument('--width', type=int, default=1024)
-    args = parser.parse_args()
-    print(args)
+        # saving
+        self.env_name = env_name
+        self.weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
+        self.checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
+        self.log_filename = 'dqn_{}_log.json'.format(env_name)
 
-    # saving
-    env_name = args.env_name
-    weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
-    checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
-    log_filename = 'dqn_{}_log.json'.format(env_name)
-
-    # loading
-    filename = 'dqn_{}_weights.h5f'.format(env_name)
-    if args.weights:
-        filename = args.weights
+        # loading
+        self.filename = 'dqn_{}_weights.h5f'.format(env_name)
+        if weights:
+            self.filename = weights
 
 
-def setupDQN(nb_actions, processor):
-    cfg = AtariConfig
+def setupDQN(cfg, nb_actions, processor):
     image_in = Input(shape=cfg.input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=cfg.input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
@@ -95,8 +87,7 @@ def setupDQN(nb_actions, processor):
     return dqn, hstate_size
 
 
-def trainDQN(env, dqn):
-    cfg = AtariConfig
+def trainDQN(cfg, env, dqn):
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
     # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
     callbacks = [ModelIntervalCheckpoint(cfg.checkpoint_weights_filename, interval=250000)]
@@ -110,8 +101,7 @@ def trainDQN(env, dqn):
     # dqn.test(env, nb_episodes=1, visualize=False)
 
 
-def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
-    cfg = AtariConfig
+def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
     # Model learner network
     action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
     action_in = Input(shape=action_shape, name='action_input')
@@ -214,8 +204,7 @@ def trainML(dqn, sequence_length, hstate_size, layer_width=1024):
     # #######################################################################################################################
 
 
-def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_size, processor):
-    cfg = AtariConfig
+def dyna_train(cfg, nb_actions, ml_model, model_truncated, sequence_length, hstate_size, processor):
     env2 = SynthEnv(ml_model, model_truncated, cfg.env, processor, sequence_length, cfg.WINDOW_LENGTH)
 
     hidden_in = Input(shape=(1, hstate_size), name='hidden_input')
@@ -243,8 +232,7 @@ def dyna_train(nb_actions, ml_model, model_truncated, sequence_length, hstate_si
     # #######################################################################################################################
 
 
-def validate(env, nb_actions, model_truncated, dqn, dqn2):
-    cfg = AtariConfig
+def validate(cfg, env, nb_actions, model_truncated, dqn, dqn2):
     image_in = Input(shape=cfg.input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=cfg.input_shape)(image_in)
     conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
@@ -279,38 +267,48 @@ def validate(env, nb_actions, model_truncated, dqn, dqn2):
 
 # #######################################################################################################################
 
-def loadDQN(dqn):
-    cfg = AtariConfig
+def loadDQN(cfg, dqn):
     print('loading: {}'.format(cfg.filename))
     dqn.load_weights(cfg.filename)
 
 
 if __name__ == "__main__":
-    cfg = AtariConfig
-    environment = gym.make(cfg.env_name)
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--mode', choices=['train', 'test'], default='train')
+    parser.add_argument('--env-name', type=str, default='PongDeterministic-v4')
+    parser.add_argument('--weights', type=str, default=None)
+    parser.add_argument('--width', type=int, default=1024)
+    args = parser.parse_args()
+    print(args)
+
+    atariCfg = AtariConfig(args.env_name, args.weights)
+    environment = gym.make(atariCfg.env_name)
     print('Playing: {}'.format(environment))
     np.random.seed(123)
     environment.seed(123)
     num_actions = environment.action_space.n
 
     # (gray-)scale
-    processor = AtariProcessor(cfg.INPUT_SHAPE)
-    dqn_agent, hidden_state_size = setupDQN(num_actions, processor)
+    processor = AtariProcessor(atariCfg.INPUT_SHAPE)
+    dqn_agent, hidden_state_size = setupDQN(atariCfg, num_actions, processor)
 
-    if cfg.args.mode == 'train':
-        trainDQN(environment, dqn_agent)
+    if args.mode == 'train':
+        if args.weights is not None:
+            loadDQN(atariCfg, dqn_agent)
+        trainDQN(atariCfg, environment, dqn_agent)
 
-    elif cfg.args.mode == 'test':
-        loadDQN(dqn_agent)
-        while dqn_agent.memory.nb_entries < cfg.memory_limit:
-            dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=cfg.nb_steps_dqn_fit)
+    elif args.mode == 'test':
+        loadDQN(atariCfg, dqn_agent)
+        while dqn_agent.memory.nb_entries < atariCfg.memory_limit:
+            dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=atariCfg.nb_steps_dqn_fit)
 
-    print('Network width: {}'.format(cfg.args.width))
-    for seq_len in [1, 3, 10, 20, 100]:
-        dynamics_model, dqn_convolutions = trainML(dqn_agent,
+    print('Network width: {}'.format(args.width))
+    for seq_len in [1, 3, 10]:
+        dynamics_model, dqn_convolutions = trainML(atariCfg, dqn_agent,
                                                    sequence_length=seq_len,
                                                    hstate_size=hidden_state_size,
-                                                   layer_width=cfg.args.width)
+                                                   layer_width=args.width)
 
     # dqn_agent2 = dyna_train(num_actions, dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
     # validate(num_actions, dqn_convolutions, dqn_agent, dqn_agent2)
