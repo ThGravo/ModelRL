@@ -20,7 +20,7 @@ In this setting, each agent can independently learn a model of the dynamics of t
 ### POMDP
 Performance is measured as the coefficient of determination (R^2), which is 0 for random guessing and 1 for perfect predictions.
 
-| Environment | Partial obs. | R^2 FF | R^2 RNN |
+| Environment | Partial obs. | R^2 FFN | R^2 RNN |
 | --- | --- | --- | --- |
 | Swimmer | 0.25 | 0.559 | 0.886 |
 | | 0.5 | 0.396 | 0.654 |
@@ -28,6 +28,18 @@ Performance is measured as the coefficient of determination (R^2), which is 0 fo
 | | 0.5 | 0.695 | 0.580 |
 | Bipedal Walker | 0.25 | 0.195 | 0.597 |
 | | 0.5 | 0.298 | 0.504 |
+
+For the tested environments (Swimmer, Hopper, Bipedal Walker) the recurrent neural network (RNN) clearly outperformed the feed-forward network (FFN) and was even under pretty severe imputation able to predict the next step in the movement trajectory.
+
+### Filter respose prediction learning
+An instance of [Kera-RL's](https://github.com/keras-rl/keras-rl) Deep Q Network (DQN) agent was trained on [OpenAI's Gym environments](https://gym.openai.com). The training for Pong succeeded, but the network failed to predict filter responses for Breakout and Seaquest at all. The numbers are therefore only listed for Pong.
+
+| DQN Agent samples |  R^2 FFN | R^2 RNN  |
+| --- | --- | --- |
+| 250k | 0.074 | 0.186 |
+| 2.75M | 1.000 | 1.000 |
+
+What seems to be confirmed is the expected performance gain for a recurrent architecture. Also, interesting to note is the difference in learnability for the number of samples the base DQN agent was trained on. After a mere 250,000 samples the learned filters presumably don't produce a well defined signal from the input images. Thus there is not enough repetative structure in the responses that it is possible to learn. Unfortunately, for the visually more complex games Breakout and Seaquest even the RNN wasn't able to capture the structure of the game.
 
 ### Multi-agent domains
 The multi-agent environments [1] feature a continuous observation and a discrete action space. The environments are as follows:
