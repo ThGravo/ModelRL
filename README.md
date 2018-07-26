@@ -8,16 +8,17 @@ Model-free deep reinforcement learning algorithms have been shown to be capable 
 ## Experiments
 ### Learning a dynamics model under partial observability
 In a Partially Observable Markov Decision Processes (POMDP), the true state $s_t$ is hidden. The agent instead receives an observation $o_t \in \Omega$, where $\Omega$ is a set of possible observations. This observation is generated from the underlying system state according to the probability distribution $o_t \sim O(s_t)$.
-The approach is evulated on agents in the robotics simulator MuJoCo using OpenAI's gym environments. The environments feature continuous observation and action spaces. In each environment, the observation spaces consist of positions and velocities of of the body parts of an agent.
+The approach is evaluated on agents in the robotics simulator MuJoCo using OpenAI's gym environments. The environments feature continuous observation and action spaces. In each environment, the observation spaces consist of positions and velocities of the body parts of an agent.
 
 ### Learning the dynamics of the internal state of an agent
-The dynamics of a video games, at the pixel level, are given by a squence of video frames produced by a sequence of actions. The straight-forward approach for model is to predict the next frame from a sequence of previous frames. While this approach has been shown to work, the idea in this experiment is a different one: instead of predicting the low-level pixel values the agent is trained to predict the dynamics of it's own convolutional network, i.e. the dynamics of the learned filter responses. This approach draws its inspiration from image classifaction, where it is common practice to reuse the lower part of a pre-trained model for a new task in order to reduce traing time and data compared to learning from scratch. Adapting this idea the filter-responses of the convolutional part of a standard RL agent are treated as observations with the hypothesis of being able to generalise over different types of video games.
+The dynamics of a video game, at the pixel level, are given by a sequence of video frames produced by a sequence of actions. The straight-forward approach for the model is to predict the next frame from a sequence of previous frames. While this approach has been shown to work, the idea in this experiment is a different one: instead of predicting the low-level pixel values the agent is trained to predict the dynamics of its own convolutional network, i.e. the dynamics of the learned filter responses. This approach draws its inspiration from image classification, where it is common practice to reuse the lower part of a pre-trained model for a new task in order to reduce training time and data compared to learning from scratch. Adapting this idea the filter-responses of the convolutional part of a standard RL agent are treated as observations with the hypothesis of being able to generalize over different types of video games.
 
 ### Independent learning in multi-agent domains
-In this setting, each agent can independently learn a model of the dynamics of the environment; the agent aims to predict its next observation given only its local observation and chosen action. The observations are the relative distances of objects or other agents in the environment. The task is to predict postions given a sequence of relative distances as the agent moves around in the evironment.
+In this setting, each agent can independently learn a model of the dynamics of the environment; the agent aims to predict its next observation given only its local observation and chosen action. The observations are the relative distances of objects or other agents in the environment. The task is to predict positions given a sequence of relative distances as the agent moves around in the environment.
 
 ## Results
 ### POMDP
+Unlike [2], where a flickering video game is simulated by dropping complete frames randomly, in a sense a more general type of data corruption is considered. Each feature can be missing with a certain probability independently. The former notion of corruption would occur in the case of all features being dropped at the same time. But in our scenario, it can, for example, happen that velocity in one coordinate is missing but the other coordinates are not. Also, the agent knows which data is missing, but a preprocessing is applied before the data is fed to the neural network. Missing data is replaced by a MICE imputation process [3], where multiple samples from a fitted model are generated. So for each frame, multiple possible imputations are created and all fed to the network.
 Performance is measured as the coefficient of determination (R^2), which is 0 for random guessing and 1 for perfect predictions.
 
 | Environment | Partial obs. | R^2 FFN | R^2 RNN |
@@ -31,20 +32,20 @@ Performance is measured as the coefficient of determination (R^2), which is 0 fo
 
 For the tested environments (Swimmer, Hopper, Bipedal Walker) the recurrent neural network (RNN) clearly outperformed the feed-forward network (FFN) and was even under pretty severe imputation able to predict the next step in the movement trajectory.
 
-### Filter respose prediction learning
-An instance of [Kera-RL's](https://github.com/keras-rl/keras-rl) Deep Q Network (DQN) agent was trained on [OpenAI's Gym environments](https://gym.openai.com). The training for Pong succeeded, but the network failed to predict filter responses for Breakout and Seaquest at all. The numbers are therefore only listed for Pong.
+### Filter response prediction learning
+An instance of [Kera-RL's](https://github.com/keras-rl/keras-rl) Deep Q Network (DQN) agent was trained in [OpenAI's Gym environments](https://gym.openai.com). The training for Pong succeeded, but the network failed to predict filter responses for Breakout and Seaquest at all. The numbers are therefore only listed for Pong.
 
 | DQN Agent samples |  R^2 FFN | R^2 RNN  |
 | --- | --- | --- |
 | 250k | 0.074 | 0.186 |
 | 2.75M | 1.000 | 1.000 |
 
-What seems to be confirmed is the expected performance gain for a recurrent architecture. Also, interesting to note is the difference in learnability for the number of samples the base DQN agent was trained on. After a mere 250,000 samples the learned filters presumably don't produce a well defined signal from the input images. Thus there is not enough repetative structure in the responses that it is possible to learn. Unfortunately, for the visually more complex games Breakout and Seaquest even the RNN wasn't able to capture the structure of the game.
+What seems to be confirmed is the expected performance gain for a recurrent architecture. Also, interesting to note is the difference in learnability for the number of samples the base DQN agent was trained on. After a mere 250,000 samples, the learned filters presumably don't produce a well-defined signal from the input images. Thus there is not enough repetitive structure in the responses that it is possible to learn. Unfortunately, for the visually more complex games Breakout and Seaquest, even the RNN wasn't able to capture the structure of the game.
 
 ### Multi-agent domains
 The multi-agent environments [1] feature a continuous observation and a discrete action space. The environments are as follows:
-* **Simple**: Single agent sees landmark position, rewarded based on how close it gets to landmark.
-* **Push**: 1 agent, 1 adversary, 1 landmark. Agent is rewarded based on distance to landmark. Adversary is rewarded if it is close to the landmark, and if the agent is far from the landmark. So the adversary learns to push agent away from the landmark.
+* **Simple**: Single agent sees landmark position, rewarded based on how close it gets to a landmark.
+* **Push**: 1 agent, 1 adversary, 1 landmark. Agent is rewarded based on distance to landmark. Adversary is rewarded if it is close to the landmark and if the agent is far from the landmark. So the adversary learns to push agent away from the landmark.
 * **Spread**: N agents, N landmarks. Agents are rewarded based on how far any agent is from each landmark. Agents are penalized if they collide with other agents. So, agents have to learn to cover all the landmarks while avoiding collisions.
 ![Multi-agent environment training](multi.jpg?raw=true "Multi-agent training")
 
@@ -56,4 +57,9 @@ Either run `MDP_learning.ipynb` or run
 
 And grab a cup of tea... It might take a while.
 
+## References
 [1] https://github.com/openai/multiagent-particle-envs
+
+[2] Matthew Hausknecht and Peter Stone, “Deep recurrent Q-learning for partially observable MDPs”
+
+[3] Roderick JA Little and Donald B Rubin, Statistical analysis with missing data
