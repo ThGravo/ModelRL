@@ -135,16 +135,18 @@ def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
     print(model_truncated.summary())
 
     data_size = dqn.memory.observations.length
-    batch_size = int(data_size / 5)
-    n_rounds = 2 * int(data_size / batch_size) + 1  # go through data 2 times
+    chunk_size = int(data_size / 100)
+    n_rounds = 2 * int(data_size / chunk_size) + 1  # go through data 2 times
     for ii in range(n_rounds):
-        hstates = np.empty((batch_size, sequence_length, hstate_size), dtype=np.float32)
-        actions = np.empty((batch_size, sequence_length, 1), dtype=np.float32)
-        next_hstate = np.empty((batch_size, hstate_size), dtype=np.float32)
-        rewards = np.empty((batch_size, 1), dtype=np.float32)
-        terminals = np.empty((batch_size, 1), dtype=np.float32)
+        print("{} of {} n_rounds".format(ii, n_rounds))
+        hstates = np.empty((chunk_size, sequence_length, hstate_size), dtype=np.float32)
+        actions = np.empty((chunk_size, sequence_length, 1), dtype=np.float32)
+        next_hstate = np.empty((chunk_size, hstate_size), dtype=np.float32)
+        rewards = np.empty((chunk_size, 1), dtype=np.float32)
+        terminals = np.empty((chunk_size, 1), dtype=np.float32)
 
-        for jj in range(batch_size):
+        for jj in range(chunk_size):
+            print("{} of {} chunk_size".format(jj, chunk_size))
             # check for terminals
             start = random.randrange(dqn.memory.window_length + 1, data_size - sequence_length)
             batch_idxs = range(start, start + sequence_length)
@@ -198,7 +200,7 @@ def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
                 print("Max: {}".format(np.max(next_hstate, axis=0)), file=text_file)
 
         ml_model.fit([hstates, actions], [next_hstate, rewards, terminals],
-                     validation_split=0.1, verbose=1, epochs=cfg.ml_model_epochs, callbacks=[
+                     validation_split=0.2, verbose=1, epochs=cfg.ml_model_epochs, callbacks=[
                 TensorBoard(log_dir='./dqn_logs/{}/{}'.format(os.path.splitext(cfg.filename)[0], log_string))])
     return ml_model, model_truncated
     # #######################################################################################################################
@@ -279,6 +281,7 @@ if __name__ == "__main__":
     parser.add_argument('--env-name', type=str, default='PongDeterministic-v4')
     parser.add_argument('--weights', type=str, default=None)
     parser.add_argument('--width', type=int, default=1024)
+    parser.add_argument('--seq_len', type=int, default=3)
     args = parser.parse_args()
     print(args)
 
@@ -304,9 +307,10 @@ if __name__ == "__main__":
             dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=atariCfg.nb_steps_dqn_fit)
 
     print('Network width: {}'.format(args.width))
-    for seq_len in [1, 3, 10]:
-        dynamics_model, dqn_convolutions = trainML(atariCfg, dqn_agent,
-                                                   sequence_length=seq_len,
+    print('Sequence length: {}'.format(args.seq_len))
+    #for seq_len in [1, 3, 10]:
+    dynamics_model, dqn_convolutions = trainML(atariCfg, dqn_agent,
+                                                   sequence_length=args.seq_len,
                                                    hstate_size=hidden_state_size,
                                                    layer_width=args.width)
 
