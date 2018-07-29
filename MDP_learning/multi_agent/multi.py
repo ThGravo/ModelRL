@@ -119,18 +119,18 @@ class MultiAgentModelLearner(LoggingModelLearner):
 
 if __name__ == "__main__":
     if False:
-        s = 50
+        s = 15
         env_name = 'simple'
         env = make_env2.make_env(env_name)
         canary = MultiAgentModelLearner(env, scenario_name=env_name,
                                         mem_size=10000 * (s + 1),
                                         sequence_length=s,
-                                        epochs=10,
-                                        net_depth=2)
+                                        epochs=100,
+                                        net_depth=3)
         canary.run(rounds=1)
     else:
         for env_name in ['simple', 'simple_spread', 'simple_push']:
-            for s in [100, 30, 0, 3, 10]:
+            for s in [0, 3, 10, 30, 100]:
                 env = make_env2.make_env(env_name)
                 for nd in [2, 3, 1]:
                     print('Running Env {} with Seqlen {} and NetDepth {}'.format(env_name, s, nd))
