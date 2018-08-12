@@ -58,7 +58,7 @@ def setupDQN(cfg, nb_actions, processor):
     q_out = Dense(nb_actions, activation='linear')(dense_out)
     model = Model(inputs=[image_in], outputs=[q_out])
     print(model.summary())
-    hstate_size = int(np.prod(conv3.shape[1:]))
+    #hstate_size = int(np.prod(conv3.shape[1:]))
 
     # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
     # even the metrics!
@@ -84,7 +84,7 @@ def setupDQN(cfg, nb_actions, processor):
                    train_interval=4, delta_clip=1.)
     dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
-    return dqn, hstate_size
+    return dqn
 
 
 def trainDQN(cfg, env, dqn):
@@ -101,26 +101,36 @@ def trainDQN(cfg, env, dqn):
     # dqn.test(env, nb_episodes=1, visualize=False)
 
 
-def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
+def trainML(cfg, dqn, sequence_length, layer_width_multi=1, do_diff=False):
+    conv_features = dqn.model.get_layer('flat_feat')
+    hstate_size = np.prod(conv_features.output_shape[1:])
+    layer_width = sequence_length * hstate_size * layer_width_multi
     # Model learner network
-    action_shape = (sequence_length, 1)  # TODO: get shape from environment. something like env.action.space.shape?
-    action_in = Input(shape=action_shape, name='action_input')
+    # TODO: get shape from environment. something like env.action.space.shape?
+    action_in = Input(shape=(sequence_length, 1), name='action_input')
     enc_state = Input(shape=(sequence_length, hstate_size), name='enc_state')
-    if sequence_length > 1:
+    if 0:#sequence_length > 1:
         action_in_reshape = Reshape((sequence_length, 1))(action_in)
-        enc_state_and_action = concatenate([enc_state, action_in_reshape], name='encoded_state_and_action')
+        enc_state_reshape = Reshape((sequence_length, hstate_size))(enc_state)
+        enc_state_and_action = concatenate([enc_state_reshape, action_in_reshape], name='encoded_state_and_action')
         lstm_out = LSTM(layer_width, activation='relu')(enc_state_and_action)
+        state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
+        reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
+        terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(lstm_out)
     else:
         action_in_flat = Flatten(name='flat_act')(action_in)
         enc_state_flat = Flatten(name='flat_state')(enc_state)
         enc_state_and_action = concatenate([enc_state_flat, action_in_flat], name='encoded_state_and_action')
         dense_out = Dense(layer_width, activation='relu')(enc_state_and_action)
-        dense_out = Dense(layer_width, activation='relu')(dense_out)
-        lstm_out = Dense(int(layer_width / 2), activation='relu')(dense_out)
+        dense_out = Dense(int(layer_width / 4), activation='relu')(dense_out)
+        dense_out = Dense(int(layer_width / 8), activation='relu')(dense_out)
+        state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(dense_out)
+        #state_pred = Reshape((1, hstate_size), name='predicted_next_state')(state_pred)
+        reward_pred = Dense(1, activation='linear', name='predicted_reward')(dense_out)
+        #reward_pred = Reshape((1, 1), name='predicted_reward')(reward_pred)
+        terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(dense_out)
+        #terminal_pred = Reshape((1, 1), name='predicted_terminal')(terminal_pred)
 
-    state_pred = Dense(hstate_size, activation='linear', name='predicted_next_state')(lstm_out)
-    reward_pred = Dense(1, activation='linear', name='predicted_reward')(lstm_out)
-    terminal_pred = Dense(1, activation='sigmoid', name='predicted_terminal')(lstm_out)
     ml_model = Model(inputs=[enc_state, action_in], outputs=[state_pred, reward_pred, terminal_pred])
     ml_model.compile('adam', loss={'predicted_next_state': 'mse',
                                    'predicted_reward': 'mse',
@@ -128,15 +138,19 @@ def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
                      metrics=['mse', 'mae', COD, NRMSE, Rsquared])
     print(ml_model.summary())
 
-    log_string = '{}_slen{}_lwidth{}-{}'.format(cfg.env_name, sequence_length, layer_width, time.time())
+    log_string = 'flat_feat_{}_slen{}_lwidth{}-{}'.format(cfg.env_name, sequence_length, layer_width, time.time())
     print('logging to {}'.format(log_string))
     ########################################################################################################################
-    model_truncated = Model(inputs=dqn.model.input, outputs=dqn.model.get_layer('flat_feat').output)
+    model_truncated = Model(inputs=dqn.model.input, outputs=conv_features.output)
     print(model_truncated.summary())
 
     data_size = dqn.memory.observations.length
     chunk_size = int(data_size / 100) + 1
     n_rounds = 2 * int(data_size / chunk_size) + 1  # go through data 2 times
+    if do_diff:
+        sample_length = sequence_length + 1
+    else:
+        sample_length = sequence_length
     for ii in range(n_rounds):
         print("{} of {} n_rounds".format(ii, n_rounds))
         hstates = np.empty((chunk_size, sequence_length, hstate_size), dtype=np.float32)
@@ -148,18 +162,18 @@ def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
         for jj in range(chunk_size):
             print("{} of {} chunk_size".format(jj, chunk_size))
             # check for terminals
-            start = random.randrange(dqn.memory.window_length + 1, data_size - sequence_length)
-            batch_idxs = range(start, start + sequence_length)
+            start = random.randrange(dqn.memory.window_length + 1, data_size - sample_length)
+            batch_idxs = range(start, start + sample_length)
             if np.min(batch_idxs) >= dqn.memory.window_length + 1:
-                experiences = dqn.memory.sample(sequence_length, batch_idxs)
+                experiences = dqn.memory.sample(sample_length, batch_idxs)
             else:
                 assert False
             while np.array([e.terminal1 for e in experiences]).any():
                 if start is 0:
-                    start = random.randrange(data_size - sequence_length)
+                    start = random.randrange(data_size - sample_length)
                 else:
                     start -= 1  # get a bit more terminal
-                experiences = dqn.memory.sample(sequence_length, range(start, start + sequence_length))
+                experiences = dqn.memory.sample(sample_length, range(start, start + sample_length))
 
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_seq = []
@@ -184,12 +198,23 @@ def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
 
             hidden_state0_seq = model_truncated.predict_on_batch(state0_seq)
             hidden_state1_seq = model_truncated.predict_on_batch(state1_seq)
+            if do_diff:
+                hidden_state0_seq = np.reshape(
+                    hidden_state0_seq[1:, ...] - hidden_state0_seq[:-1, ...], (sequence_length, hstate_size))
+                hidden_state1_seq = np.reshape(
+                    hidden_state1_seq[1:, ...] - hidden_state1_seq[:-1, ...], (sequence_length, hstate_size))
+            else:
+                hidden_state0_seq = np.reshape(hidden_state0_seq, (sequence_length, hstate_size))
+                hidden_state1_seq = np.reshape(hidden_state1_seq, (sequence_length, hstate_size))
 
-            hstates[jj, ...] = hidden_state0_seq[np.newaxis, :, :]
-            actions[jj, ...] = action_seq[np.newaxis, :, np.newaxis]
-            next_hstate[jj, ...] = hidden_state1_seq[np.newaxis, -1, :]
-            rewards[jj, ...] = reward_seq[np.newaxis, -1]
-            terminals[jj, ...] = terminal1_seq[np.newaxis, -1]
+            hstates[jj, :, :] = hidden_state0_seq
+            if do_diff:
+                actions[jj, :, :] = action_seq[1:, np.newaxis]
+            else:
+                actions[jj, :, :] = action_seq[:, np.newaxis]
+            next_hstate[jj, :] = hidden_state1_seq[-1, :]
+            rewards[jj, :] = reward_seq[-1]
+            terminals[jj, :] = terminal1_seq[-1]
 
         if False:  # Debug
             with open("{}DataStats.txt".format(cfg.env_name), "w") as text_file:
@@ -280,8 +305,8 @@ if __name__ == "__main__":
     parser.add_argument('--mode', choices=['train', 'test'], default='train')
     parser.add_argument('--env-name', type=str, default='PongDeterministic-v4')
     parser.add_argument('--weights', type=str, default=None)
-    parser.add_argument('--width', type=int, default=1024)
-    parser.add_argument('--seq_len', type=int, default=3)
+    parser.add_argument('--width_multi', type=int, default=1)
+    parser.add_argument('--seq_len', type=int, default=2)
     args = parser.parse_args()
     print(args)
 
@@ -294,7 +319,7 @@ if __name__ == "__main__":
 
     # (gray-)scale
     processor = AtariProcessor(atariCfg.INPUT_SHAPE)
-    dqn_agent, hidden_state_size = setupDQN(atariCfg, num_actions, processor)
+    dqn_agent = setupDQN(atariCfg, num_actions, processor)
 
     if args.mode == 'train':
         if args.weights is not None:
@@ -304,15 +329,15 @@ if __name__ == "__main__":
     elif args.mode == 'test':
         loadDQN(atariCfg, dqn_agent)
         while dqn_agent.memory.nb_entries < atariCfg.memory_limit:
+            print("{} samples of {}".format(dqn_agent.memory.nb_entries, atariCfg.memory_limit))
             dqn_agent.test(environment, nb_episodes=1, visualize=False, nb_max_episode_steps=atariCfg.nb_steps_dqn_fit)
 
-    print('Network width: {}'.format(args.width))
+    print('Network width multiplier: {}'.format(args.width_multi))
     print('Sequence length: {}'.format(args.seq_len))
-    #for seq_len in [1, 3, 10]:
+    # for seq_len in [1, 3, 10]:
     dynamics_model, dqn_convolutions = trainML(atariCfg, dqn_agent,
-                                                   sequence_length=args.seq_len,
-                                                   hstate_size=hidden_state_size,
-                                                   layer_width=args.width)
+                                               sequence_length=args.seq_len,
+                                               layer_width_multi=args.width_multi)
 
     # dqn_agent2 = dyna_train(num_actions, dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
     # validate(num_actions, dqn_convolutions, dqn_agent, dqn_agent2)
