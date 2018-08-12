@@ -7,7 +7,7 @@ import numpy as np
 import gym
 
 from keras.models import Model
-from keras.layers import Dense, Flatten, Conv2D, Permute, Input, LSTM, concatenate, Reshape
+from keras.layers import Dense, Flatten, Conv2D, Permute, Input, LSTM, concatenate, Reshape, ConvLSTM2D
 from keras.optimizers import Adam
 from keras.callbacks import TensorBoard
 
@@ -25,10 +25,10 @@ class AtariConfig:
     def __init__(self, env_name='PongDeterministic-v4', weights=None):
         self.INPUT_SHAPE = (84, 84)
         self.WINDOW_LENGTH = 4
-        self.nb_steps_dqn_fit = 1834567  # 1750000
+        self.nb_steps_dqn_fit = 177700#0
         self.nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(self.nb_steps_dqn_fit))) * 42 + 42  # 50000
         self.target_model_update_dqn_agent = int(max(0, np.sqrt(self.nb_steps_dqn_fit))) * 8 + 8  # 10000
-        self.memory_limit = int(self.nb_steps_dqn_fit/2)  # 1000000
+        self.memory_limit = int(self.nb_steps_dqn_fit / 2)  # 1000000
         self.nb_steps_annealed_policy = int(self.nb_steps_dqn_fit / 2)  # 1000000
         self.ml_model_epochs = 30
 
@@ -50,9 +50,9 @@ class AtariConfig:
 def setupDQN(cfg, nb_actions, processor):
     image_in = Input(shape=cfg.input_shape, name='main_input')
     input_perm = Permute((2, 3, 1), input_shape=cfg.input_shape)(image_in)
-    conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4))(input_perm)
-    conv2 = Conv2D(64, (4, 4), activation="relu", strides=(2, 2))(conv1)
-    conv3 = Conv2D(64, (3, 3), activation="relu", strides=(1, 1))(conv2)
+    conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4), name='conv1')(input_perm)
+    conv2 = Conv2D(64, (4, 4), activation="relu", strides=(2, 2), name='conv2')(conv1)
+    conv3 = Conv2D(64, (3, 3), activation="relu", strides=(1, 1), name='conv3')(conv2)
     conv_out = Flatten(name='flat_feat')(conv3)
     dense_out = Dense(512, activation='relu')(conv_out)
     q_out = Dense(nb_actions, activation='linear')(dense_out)
@@ -135,7 +135,7 @@ def trainML(cfg, dqn, sequence_length, hstate_size, layer_width=1024):
     print(model_truncated.summary())
 
     data_size = dqn.memory.observations.length
-    chunk_size = int(data_size / 100)
+    chunk_size = int(data_size / 100) + 1
     n_rounds = 2 * int(data_size / chunk_size) + 1  # go through data 2 times
     for ii in range(n_rounds):
         print("{} of {} n_rounds".format(ii, n_rounds))
