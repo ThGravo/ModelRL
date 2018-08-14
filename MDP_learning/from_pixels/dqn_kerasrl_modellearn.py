@@ -7,98 +7,20 @@ import numpy as np
 import gym
 
 from keras.models import Model
-from keras.layers import Dense, Flatten, Conv2D, Permute, Input, LSTM, concatenate, Reshape, ConvLSTM2D
+from keras.layers import Dense, Flatten, Conv2D, Permute, Input, LSTM, concatenate, Reshape
 from keras.optimizers import Adam
 from keras.callbacks import TensorBoard
 
 from rl.agents.dqn import DQNAgent
-from rl.policy import LinearAnnealedPolicy, BoltzmannQPolicy, EpsGreedyQPolicy
+from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
 from rl.memory import SequentialMemory
-from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
+from MDP_learning.from_pixels.atari_config import AtariConfig
+from MDP_learning.from_pixels.dqn_agent import setupDQN, trainDQN
+from MDP_learning.from_pixels.trainICM import train_icm
 from MDP_learning.helpers.custom_metrics import COD, NRMSE, Rsquared
 from MDP_learning.from_pixels.atari_preprocessor import AtariProcessor
 from MDP_learning.from_pixels.synth_env import SynthEnv
-
-
-class AtariConfig:
-    def __init__(self, env_name='PongDeterministic-v4', weights=None):
-        self.INPUT_SHAPE = (84, 84)
-        self.WINDOW_LENGTH = 4
-        self.nb_steps_dqn_fit = 177700#0
-        self.nb_steps_warmup_dqn_agent = int(max(0, np.sqrt(self.nb_steps_dqn_fit))) * 42 + 42  # 50000
-        self.target_model_update_dqn_agent = int(max(0, np.sqrt(self.nb_steps_dqn_fit))) * 8 + 8  # 10000
-        self.memory_limit = int(self.nb_steps_dqn_fit / 2)  # 1000000
-        self.nb_steps_annealed_policy = int(self.nb_steps_dqn_fit / 2)  # 1000000
-        self.ml_model_epochs = 30
-
-        # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
-        self.input_shape = (self.WINDOW_LENGTH,) + self.INPUT_SHAPE
-
-        # saving
-        self.env_name = env_name
-        self.weights_filename = 'dqn_{}_weights.h5f'.format(env_name)
-        self.checkpoint_weights_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
-        self.log_filename = 'dqn_{}_log.json'.format(env_name)
-
-        # loading
-        self.filename = 'dqn_{}_weights.h5f'.format(env_name)
-        if weights:
-            self.filename = weights
-
-
-def setupDQN(cfg, nb_actions, processor):
-    image_in = Input(shape=cfg.input_shape, name='main_input')
-    input_perm = Permute((2, 3, 1), input_shape=cfg.input_shape)(image_in)
-    conv1 = Conv2D(32, (8, 8), activation="relu", strides=(4, 4), name='conv1')(input_perm)
-    conv2 = Conv2D(64, (4, 4), activation="relu", strides=(2, 2), name='conv2')(conv1)
-    conv3 = Conv2D(64, (3, 3), activation="relu", strides=(1, 1), name='conv3')(conv2)
-    conv_out = Flatten(name='flat_feat')(conv3)
-    dense_out = Dense(512, activation='relu')(conv_out)
-    q_out = Dense(nb_actions, activation='linear')(dense_out)
-    model = Model(inputs=[image_in], outputs=[q_out])
-    print(model.summary())
-    #hstate_size = int(np.prod(conv3.shape[1:]))
-
-    # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
-    # even the metrics!
-    memory = SequentialMemory(limit=cfg.memory_limit, window_length=cfg.WINDOW_LENGTH)
-
-    # Select a policy. We use eps-greedy action selection, which means that a random action is selected
-    # with probability eps. We anneal eps from 1.0 to 0.1 over the course of 1M steps. This is done so that
-    # the agent initially explores the environment (high eps) and then gradually sticks to what it knows
-    # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
-    # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
-    policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                                  nb_steps=cfg.nb_steps_annealed_policy)
-
-    # The trade-off between exploration and exploitation is difficult and an on-going research topic.
-    # If you want, you can experiment with the parameters or use a different policy. Another popular one
-    # is Boltzmann-style exploration:
-    # policy = BoltzmannQPolicy(tau=1.)
-    # Feel free to give it a try!
-
-    dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
-                   processor=processor, nb_steps_warmup=cfg.nb_steps_warmup_dqn_agent, gamma=.99,
-                   target_model_update=cfg.target_model_update_dqn_agent,
-                   train_interval=4, delta_clip=1.)
-    dqn.compile(Adam(lr=.00025), metrics=['mae'])
-
-    return dqn
-
-
-def trainDQN(cfg, env, dqn):
-    # Okay, now it's time to learn something! We capture the interrupt exception so that training
-    # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
-    callbacks = [ModelIntervalCheckpoint(cfg.checkpoint_weights_filename, interval=250000)]
-    callbacks += [FileLogger(cfg.log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=cfg.nb_steps_dqn_fit, log_interval=10000)
-
-    # After training is done, we save the final weights one more time.
-    dqn.save_weights(cfg.weights_filename, overwrite=True)
-
-    # Finally, evaluate our algorithm for 10 episodes.
-    # dqn.test(env, nb_episodes=1, visualize=False)
 
 
 def trainML(cfg, dqn, sequence_length, layer_width_multi=1, do_diff=False):
@@ -300,6 +222,7 @@ def loadDQN(cfg, dqn):
 
 
 if __name__ == "__main__":
+    print('START')
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--mode', choices=['train', 'test'], default='train')
@@ -335,9 +258,11 @@ if __name__ == "__main__":
     print('Network width multiplier: {}'.format(args.width_multi))
     print('Sequence length: {}'.format(args.seq_len))
     # for seq_len in [1, 3, 10]:
-    dynamics_model, dqn_convolutions = trainML(atariCfg, dqn_agent,
+    '''dynamics_model, dqn_convolutions = trainML(atariCfg, dqn_agent,
                                                sequence_length=args.seq_len,
                                                layer_width_multi=args.width_multi)
+    '''
+    im_model = train_icm(atariCfg, dqn_agent, num_actions)
 
     # dqn_agent2 = dyna_train(num_actions, dynamics_model, dqn_convolutions, seq_len, hidden_state_size)
     # validate(num_actions, dqn_convolutions, dqn_agent, dqn_agent2)
