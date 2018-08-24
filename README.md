@@ -46,7 +46,7 @@ What seems to be confirmed is the expected performance gain for a recurrent arch
 
 __UPDATE (August '18):__
 Recently I came across a similar approach [8](#references), where the predictability of filter responses is used as an indicator for previously unseen states. The agent is then incentivized to explore the environment by achieving rewards for reaching states, which are not well predicted.
-Although the filters themselves are trained on the filter response prediction task - jointly with inferring the action underlying the observed state transition, which avoids the trivial solution - the MSE is comparable to the one achieved here (4*10^-4 vs. 2*10^-3). The resulting mean absolute percentage error is therefore also quite high (4*10^4).
+Although the filters themselves are trained on the filter response prediction task - jointly with inferring the action underlying the observed state transition, which avoids the trivial solution - the MSE is comparable to the one achieved here (4x10^-4 vs. 2x10^-3). The resulting mean absolute percentage error is therefore also quite high (4x10^4).
 
 ### Multi-agent domains
 The multi-agent environments [1](#references) feature a continuous observation and a discrete action space. The environments are as follows:
