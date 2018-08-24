@@ -44,6 +44,10 @@ An instance of [Kera-RL's](https://github.com/keras-rl/keras-rl) Deep Q Network 
 
 What seems to be confirmed is the expected performance gain for a recurrent architecture. Also, interesting to note is the difference in learnability for the number of samples the base DQN agent was trained on. After a mere 250,000 samples, the learned filters presumably don't produce a well-defined signal from the input images. Thus there is not enough structure in the responses that it is possible to learn. Unfortunately, for the visually more complex games Breakout and Seaquest, even the RNN wasn't able to capture the structure of the game.
 
+__UPDATE (August '18):__
+Recently I came across a similar approach [8](#references), where the predictability of filter responses is used as an indicator for previously unseen states. The agent is then incentivized to explore the environment by achieving rewards for reaching states, which are not well predicted.
+Although the filters themselves are trained on the filter response prediction task - jointly with inferring the action underlying the observed state transition, which avoids the trivial solution - the MSE is comparable to the one achieved here (4*10^-4 vs. 2*10^-3). The resulting mean absolute percentage error is therefore also quite high (4*10^4).
+
 ### Multi-agent domains
 The multi-agent environments [1](#references) feature a continuous observation and a discrete action space. The environments are as follows:
 * **Simple**: Single agent sees landmark position, rewarded based on how close it gets to a landmark.
@@ -78,3 +82,6 @@ And grab a cup of tea... It might take a while.
 [6] http://bair.berkeley.edu/blog/2017/07/18/learning-to-learn/
 
 [7] Karthik Narasimhan, Regina Barzilay, and Tommi Jaakkola, "Deep Transfer in Reinforcement Learning by Language Grounding"
+
+[8] Deepak Pathak, Pulkit Agrawal, Alexei A. Efros, Trevor Darrell, "
+Curiosity-driven Exploration by Self-supervised Prediction"
